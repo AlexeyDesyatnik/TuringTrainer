@@ -298,6 +298,18 @@ describe('фиксация статистики попытки', () => {
 
     expect(useProgressStore.getState().attempts).toHaveLength(1)
   })
+
+  it('диагностирует пропуск останавливающей команды при подсчёте шагов', () => {
+    const store = useSessionStore.getState()
+    store.selectTask('l1-trace-01')
+    store.setNumericAnswer('2')
+    store.submitAnswer()
+
+    expect(useProgressStore.getState().attempts[0]).toMatchObject({
+      correct: false,
+      errors: ['stop-step-not-counted'],
+    })
+  })
 })
 
 describe('экзаменационный режим', () => {

@@ -11,6 +11,7 @@ import { getNextTask, useProgressStore } from './progressStore'
 export type AnswerDraft =
   | { type: 'choice'; value: string }
   | { type: 'prediction'; write: string; direction: Direction | ''; nextState: string }
+  | { type: 'steps'; value: string }
   | null
 
 export type AnimationPhase = 'write' | 'move' | 'state' | null
@@ -52,6 +53,7 @@ interface SessionState {
   undo: () => void
   reset: () => void
   setChoice: (value: string) => void
+  setNumericAnswer: (value: string) => void
   updatePrediction: (values: Partial<Omit<Extract<AnswerDraft, { type: 'prediction' }>, 'type'>>) => void
   submitAnswer: () => void
   retry: () => void
@@ -264,6 +266,11 @@ export const useSessionStore = create<SessionState>((set, get) => {
       set({ draft: { type: 'choice', value }, result: null })
     },
 
+    setNumericAnswer: (value) => {
+      if (get().result !== null || get().draft?.type !== 'steps') return
+      set({ draft: { type: 'steps', value }, result: null })
+    },
+
     updatePrediction: (values) => {
       const { draft, result } = get()
       if (result !== null || draft?.type !== 'prediction') return
@@ -452,6 +459,7 @@ function createDraft(task: Task): AnswerDraft {
   if (task.answer.type === 'prediction') {
     return { type: 'prediction', write: '', direction: '', nextState: '' }
   }
+  if (task.answer.type === 'steps') return { type: 'steps', value: '' }
   return null
 }
 
@@ -460,6 +468,12 @@ function draftToAnswer(draft: AnswerDraft): TaskAnswer | null {
 
   if (draft.type === 'choice') {
     return draft.value === '' ? null : draft
+  }
+
+  if (draft.type === 'steps') {
+    const value = Number(draft.value)
+    if (draft.value === '' || !Number.isInteger(value) || value < 0) return null
+    return { type: 'steps', value }
   }
 
   if (draft.write === '' || draft.direction === '' || draft.nextState === '') return null
@@ -478,14 +492,23 @@ function getSimulationUsage(stepsExecuted: number, halted: boolean): SimulationU
 }
 
 function diagnoseErrors(task: Task, submitted: TaskAnswer): string[] {
-  if (task.answer.type !== 'prediction' || submitted.type !== 'prediction') return []
-
   const availableCodes = new Set(task.commonMistakes.map((mistake) => mistake.type))
   const errors = new Set<string>()
   const addAvailable = (...codes: string[]) => {
     const code = codes.find((candidate) => availableCodes.has(candidate))
     if (code !== undefined) errors.add(code)
   }
+
+  if (task.answer.type === 'steps' && submitted.type === 'steps') {
+    if (submitted.value === task.answer.value - 1) {
+      addAvailable('stop-step-not-counted', 'wrong-count')
+    } else if (submitted.value !== task.answer.value) {
+      addAvailable('wrong-count')
+    }
+    return [...errors]
+  }
+
+  if (task.answer.type !== 'prediction' || submitted.type !== 'prediction') return []
 
   if (task.answer.write !== submitted.write) {
     addAvailable('wrong-write-symbol', 'wrong-command')

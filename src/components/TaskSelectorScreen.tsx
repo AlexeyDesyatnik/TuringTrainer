@@ -109,6 +109,8 @@ export function skillLabel(skill: string): string {
     'command-reading': 'Чтение команды',
     'single-step': 'Один шаг',
     'machine-mechanics': 'Механика машины',
+    'short-trace': 'Короткая трассировка',
+    'command-completion': 'Восстановление команды',
   }
   return labels[skill] ?? skill
 }

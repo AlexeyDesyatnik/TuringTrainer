@@ -410,6 +410,7 @@ function AnswerPanel({ task, draft, animationActive }: {
 }) {
   const result = useSessionStore((state) => state.result)
   const setChoice = useSessionStore((state) => state.setChoice)
+  const setNumericAnswer = useSessionStore((state) => state.setNumericAnswer)
   const updatePrediction = useSessionStore((state) => state.updatePrediction)
   const submitAnswer = useSessionStore((state) => state.submitAnswer)
   const retry = useSessionStore((state) => state.retry)
@@ -421,7 +422,7 @@ function AnswerPanel({ task, draft, animationActive }: {
       <div className="max-w-4xl">
         <p className="text-xs font-bold uppercase tracking-[0.16em] text-violet-700">Твой ответ</p>
         <h3 id="answer-heading" className="mt-1 text-2xl font-black text-slate-950">
-          {task.answer.type === 'prediction' ? 'Предскажи команду до запуска' : 'Выбери команду'}
+          {answerHeading(task.answer)}
         </h3>
 
         {draft?.type === 'choice' && task.choices !== undefined && (
@@ -498,6 +499,23 @@ function AnswerPanel({ task, draft, animationActive }: {
           </div>
         )}
 
+        {draft?.type === 'steps' && (
+          <label className="mt-5 block max-w-sm text-sm font-bold text-slate-700">
+            Количество выполненных команд
+            <input
+              aria-label="Количество шагов"
+              className={selectClass}
+              disabled={result !== null || animationActive}
+              inputMode="numeric"
+              min="0"
+              onChange={(event) => setNumericAnswer(event.target.value)}
+              step="1"
+              type="number"
+              value={draft.value}
+            />
+          </label>
+        )}
+
         <button className={`${primaryButton} mt-5`} disabled={!complete || result !== null || animationActive} onClick={submitAnswer} type="button">
           Проверить ответ
         </button>
@@ -547,7 +565,17 @@ function AnswerPanel({ task, draft, animationActive }: {
 function isDraftComplete(draft: AnswerDraft): boolean {
   if (draft === null) return false
   if (draft.type === 'choice') return draft.value !== ''
+  if (draft.type === 'steps') {
+    const value = Number(draft.value)
+    return draft.value !== '' && Number.isInteger(value) && value >= 0
+  }
   return draft.write !== '' && draft.direction !== '' && draft.nextState !== ''
+}
+
+function answerHeading(answer: TaskAnswer): string {
+  if (answer.type === 'prediction') return 'Предскажи команду до запуска'
+  if (answer.type === 'steps') return 'Укажи число выполненных команд'
+  return 'Выбери команду'
 }
 
 function displaySymbol(symbol: string): string {
@@ -601,8 +629,17 @@ function formatAnswer(task: Task, answer: TaskAnswer): string {
     return `${displaySymbol(answer.write)} · ${answer.direction} · ${answer.nextState}`
   }
   if (answer.type === 'count') return `${answer.value} символов «${displaySymbol(answer.symbol)}»`
-  if (answer.type === 'steps') return `${answer.value} шагов`
+  if (answer.type === 'steps') return `${answer.value} ${stepsWord(answer.value)}`
   return Object.entries(answer.value)
     .map(([index, symbol]) => `${index}:${displaySymbol(symbol)}`)
     .join(', ')
+}
+
+function stepsWord(value: number): string {
+  const lastTwoDigits = value % 100
+  if (lastTwoDigits >= 11 && lastTwoDigits <= 14) return 'шагов'
+  const lastDigit = value % 10
+  if (lastDigit === 1) return 'шаг'
+  if (lastDigit >= 2 && lastDigit <= 4) return 'шага'
+  return 'шагов'
 }

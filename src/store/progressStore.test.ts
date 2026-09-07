@@ -90,18 +90,32 @@ describe('рекомендации задач', () => {
       taskId: 'l1-prediction-01',
       correct: true,
     }
-    expect(getRecommendedTask([supported, secondSolved])?.id).toBe('l1-command-reading-01')
+    const traceSolved: AttemptStats = { ...secondSolved, taskId: 'l1-trace-01' }
+    const completionSolved: AttemptStats = { ...secondSolved, taskId: 'l1-completion-01' }
+    expect(getRecommendedTask([
+      supported,
+      secondSolved,
+      traceSolved,
+      completionSolved,
+    ])?.id).toBe('l1-command-reading-01')
   })
 
   it('выбирает следующую нерешённую задачу того же уровня', () => {
     const current = tasks[0]
     if (current === undefined) throw new Error('Нет тестовой задачи')
 
-    expect(getNextTask(current, [], 'learning')?.id).toBe('l1-prediction-01')
+    expect(getNextTask(current, [], 'learning')?.id).toBe('l1-completion-01')
     expect(getNextTask(current, [{
       ...baseAttempt,
-      taskId: 'l1-prediction-01',
+      taskId: 'l1-completion-01',
       correct: true,
-    }], 'learning')).toBeNull()
+    }], 'learning')?.id).toBe('l1-prediction-01')
+
+    const solvedOthers = tasks.slice(1).map((task) => ({
+      ...baseAttempt,
+      taskId: task.id,
+      correct: true,
+    }))
+    expect(getNextTask(current, solvedOthers, 'learning')).toBeNull()
   })
 })

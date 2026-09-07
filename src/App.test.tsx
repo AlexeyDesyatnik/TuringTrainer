@@ -175,4 +175,38 @@ describe('экран учебной задачи', () => {
     act(() => vi.advanceTimersByTime(2000))
     expect(useSessionStore.getState().elapsedMs).toBe(1000)
   })
+
+  it('принимает целое число команд в задаче на трассировку', () => {
+    useSessionStore.getState().selectTask('l1-trace-01')
+    useSessionStore.getState().retry()
+    render(<App />)
+
+    const submit = screen.getByRole('button', { name: 'Проверить ответ' })
+    expect(screen.getByRole('heading', { name: 'Короткая трассировка' })).toBeInTheDocument()
+    expect(submit).toBeDisabled()
+
+    fireEvent.change(screen.getByLabelText('Количество шагов'), { target: { value: '2.5' } })
+    expect(submit).toBeDisabled()
+    fireEvent.change(screen.getByLabelText('Количество шагов'), { target: { value: '3' } })
+    expect(submit).toBeEnabled()
+    fireEvent.click(submit)
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Верно')
+    expect(screen.getByRole('alert')).toHaveTextContent('Правильный ответ: 3 шага')
+  })
+
+  it('проходит задачу на восстановление отсутствующей команды', () => {
+    useSessionStore.getState().selectTask('l1-completion-01')
+    useSessionStore.getState().retry()
+    render(<App />)
+
+    expect(
+      screen.getAllByRole('cell', { name: '—' }).some((cell) => cell.getAttribute('aria-current') === 'step'),
+    ).toBe(true)
+    fireEvent.click(screen.getByLabelText('Записать 0, сдвинуться влево, перейти в q1'))
+    fireEvent.click(screen.getByRole('button', { name: 'Проверить ответ' }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Верно')
+    expect(screen.getByRole('alert')).toHaveTextContent('0 · L · q1')
+  })
 })

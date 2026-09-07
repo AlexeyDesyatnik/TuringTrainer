@@ -127,4 +127,37 @@ describe('эталонные шаги учебных задач', () => {
       { index: 1, symbol: '1' },
     ])
   })
+
+  it('подтверждает полный ответ задачи на короткую трассировку', () => {
+    const task = getTask('l1-trace-01')
+    const machine = new TuringMachine(task.machine)
+    const trace = []
+
+    while (!machine.isHalted()) {
+      const result = machine.step()
+      if (result !== null) trace.push(result)
+    }
+
+    expect(task.answer).toEqual({ type: 'steps', value: 3 })
+    expect(trace).toHaveLength(3)
+    expect(trace.map((step) => step.read)).toEqual(['1', '1', 'λ'])
+    expect(machine.getTapeView(1, 1)).toEqual([
+      { index: 0, symbol: '0' },
+      { index: 1, symbol: '0' },
+      { index: 2, symbol: 'λ' },
+    ])
+    expect(machine.getHaltReason()).toBe('stop-command')
+  })
+
+  it('оставляет восстанавливаемую команду явно отсутствующей в таблице', () => {
+    const task = getTask('l1-completion-01')
+    const machine = new TuringMachine(task.machine)
+
+    expect(machine.step()).toBeNull()
+    expect(machine.getHaltReason()).toBe('missing-command')
+    expect(task.answer).toEqual({ type: 'choice', value: 'write-0-left-q1' })
+    expect(task.choices?.find((choice) => choice.value === 'write-0-left-q1')?.label).toContain(
+      'Записать 0, сдвинуться влево, перейти в q1',
+    )
+  })
 })

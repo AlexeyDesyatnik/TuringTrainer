@@ -53,7 +53,7 @@ describe('навигация приложения', () => {
     expect(screen.getByRole('heading', { name: 'Что тренировать дальше?' })).toBeInTheDocument()
     expect(screen.getByText('Предскажи следующий шаг')).toBeInTheDocument()
     expect(screen.getAllByText('Самостоятельно')).toHaveLength(2)
-    expect(screen.getByText('Решено 1 из 2')).toBeInTheDocument()
+    expect(screen.getByText('Решено 1 из 4')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Начать рекомендованную задачу' }))
     expect(screen.getByRole('heading', { name: 'Предскажи следующий шаг' })).toBeInTheDocument()
