@@ -3,8 +3,15 @@
 @tailwind utilities;
 
 :root {
+  --dir-l: #3b82f6;
+  --dir-r: #f97316;
+  --dir-n: #6b7280;
+  --dir-s: #ef4444;
+  --state-current: #8b5cf6;
+  --cell-active: #fbbf24;
+  --cell-write: #22c55e;
   color: #0f172a;
-  background: #f8fafc;
+  background: #f5f3ee;
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -14,4 +21,22 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  background:
+    radial-gradient(circle at 85% 12%, rgb(237 233 254 / 65%), transparent 28rem),
+    #f5f3ee;
+}
+
+button,
+select,
+input {
+  font: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
