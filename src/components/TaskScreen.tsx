@@ -31,6 +31,8 @@ export function TaskScreen() {
   const autoSpeedMs = useSessionStore((state) => state.autoSpeedMs)
   const animationPhase = useSessionStore((state) => state.animationPhase)
   const animatedStep = useSessionStore((state) => state.animatedStep)
+  const mode = useSessionStore((state) => state.mode)
+  const elapsedMs = useSessionStore((state) => state.elapsedMs)
   const selectTask = useSessionStore((state) => state.selectTask)
   const step = useSessionStore((state) => state.step)
   const undo = useSessionStore((state) => state.undo)
@@ -39,8 +41,16 @@ export function TaskScreen() {
   const stopAuto = useSessionStore((state) => state.stopAuto)
   const setAutoSpeed = useSessionStore((state) => state.setAutoSpeed)
   const setReducedMotion = useSessionStore((state) => state.setReducedMotion)
+  const setMode = useSessionStore((state) => state.setMode)
+  const startExamTimer = useSessionStore((state) => state.startExamTimer)
+  const stopExamTimer = useSessionStore((state) => state.stopExamTimer)
 
   useEffect(() => stopAuto, [stopAuto])
+
+  useEffect(() => {
+    if (mode === 'exam' && result === null) startExamTimer()
+    return stopExamTimer
+  }, [mode, result, startExamTimer, stopExamTimer])
 
   useEffect(() => {
     if (typeof window.matchMedia !== 'function') return
@@ -108,7 +118,24 @@ export function TaskScreen() {
           <div>
             <div className="mb-3 flex flex-wrap gap-2 text-xs font-bold uppercase tracking-wide">
               <span className="rounded-full bg-violet-100 px-3 py-1 text-violet-800">Уровень {task.level}</span>
-              <span className="rounded-full bg-slate-200 px-3 py-1 text-slate-700">Учебный режим</span>
+              <div aria-label="Режим выполнения" className="flex rounded-full bg-slate-200 p-0.5" role="group">
+                <button
+                  aria-pressed={mode === 'learning'}
+                  className={`rounded-full px-3 py-1 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 ${mode === 'learning' ? 'bg-white text-violet-800 shadow-sm' : 'text-slate-600'}`}
+                  onClick={() => setMode('learning')}
+                  type="button"
+                >
+                  Учебный
+                </button>
+                <button
+                  aria-pressed={mode === 'exam'}
+                  className={`rounded-full px-3 py-1 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 ${mode === 'exam' ? 'bg-slate-950 text-white shadow-sm' : 'text-slate-600'}`}
+                  onClick={() => setMode('exam')}
+                  type="button"
+                >
+                  Экзаменационный
+                </button>
+              </div>
             </div>
             <h2 className="text-3xl font-black tracking-tight text-slate-950">{task.title}</h2>
             <p className="mt-3 max-w-3xl text-base leading-7 text-slate-600">{task.description}</p>
@@ -131,6 +158,7 @@ export function TaskScreen() {
               <span>Состояние <strong className="text-violet-700">{state}</strong></span>
               <span>Головка <strong>{headPosition}</strong></span>
               <span>Шагов <strong>{stepCount}</strong></span>
+              {mode === 'exam' && <span>Таймер <strong>{formatDuration(elapsedMs)}</strong></span>}
             </div>
           </div>
 
@@ -246,18 +274,21 @@ export function TaskScreen() {
 function ProgressSummary() {
   const attempts = useProgressStore((state) => state.attempts)
   const correct = attempts.filter((attempt) => attempt.correct).length
+  const learning = attempts.filter((attempt) => attempt.mode === 'learning').length
+  const exam = attempts.filter((attempt) => attempt.mode === 'exam').length
   const independent = attempts.filter(
     (attempt) => attempt.correct && attempt.hintsUsed === 0,
   ).length
 
   return (
     <p aria-label="Сохранённый прогресс" className="mt-2 text-right font-mono text-xs text-slate-400">
-      Попыток: {attempts.length} · верно: {correct} · самостоятельно: {independent}
+      Попыток: {attempts.length} · учебных: {learning} · экзамен: {exam} · верно: {correct} · самостоятельно: {independent}
     </p>
   )
 }
 
 function HintPanel({ task, animationActive }: { task: Task; animationActive: boolean }) {
+  const mode = useSessionStore((state) => state.mode)
   const openedHints = useSessionStore((state) => state.openedHints)
   const result = useSessionStore((state) => state.result)
   const openNextHint = useSessionStore((state) => state.openNextHint)
@@ -267,6 +298,12 @@ function HintPanel({ task, animationActive }: { task: Task; animationActive: boo
     <section aria-labelledby="hints-heading" className="rounded-2xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
       <p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-800">Поддержка</p>
       <h3 id="hints-heading" className="mt-1 text-lg font-black text-slate-950">Подсказки</h3>
+      {mode === 'exam' ? (
+        <p className="mt-2 rounded-xl bg-slate-950 p-3 text-sm leading-6 text-white">
+          В экзаменационном режиме подсказки недоступны.
+        </p>
+      ) : (
+        <>
       <p className="mt-2 text-sm leading-6 text-slate-600">
         Помощь не снижает правильность, но учитывается отдельно.
       </p>
@@ -295,6 +332,8 @@ function HintPanel({ task, animationActive }: { task: Task; animationActive: boo
 
       {allHintsOpened && (
         <p className="mt-4 text-sm font-semibold text-amber-900">Все три подсказки открыты.</p>
+      )}
+        </>
       )}
     </section>
   )
@@ -477,6 +516,12 @@ function AnswerPanel({ task, draft, animationActive }: {
                     : `с поддержкой, подсказок использовано: ${result.hintsUsed}`}
                 </dd>
               </div>
+              <div>
+                <dt className="inline font-bold">Режим и время: </dt>
+                <dd className="inline">
+                  {result.mode === 'exam' ? 'экзаменационный' : 'учебный'}, {formatDuration(result.durationMs)}
+                </dd>
+              </div>
             </dl>
             <p className="mt-3 text-sm leading-6 text-slate-700">{task.explanation}</p>
             <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -501,6 +546,13 @@ function isDraftComplete(draft: AnswerDraft): boolean {
 
 function displaySymbol(symbol: string): string {
   return symbol === EMPTY_SYMBOL ? '␣' : symbol
+}
+
+function formatDuration(durationMs: number): string {
+  const totalSeconds = Math.floor(durationMs / 1000)
+  const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0')
+  const seconds = (totalSeconds % 60).toString().padStart(2, '0')
+  return `${minutes}:${seconds}`
 }
 
 function animationPhaseLabel(phase: Exclude<AnimationPhase, null>): string {

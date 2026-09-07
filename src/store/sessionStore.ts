@@ -4,7 +4,7 @@ import { checkAnswer } from '../core/checkAnswer'
 import { TuringMachine } from '../core/TuringMachine'
 import { tasks } from '../data/tasks'
 import type { Direction, StepResult } from '../types/machine'
-import type { AttemptStats, SimulationUsage } from '../types/progress'
+import type { AttemptMode, AttemptStats, SimulationUsage } from '../types/progress'
 import type { Task, TaskAnswer } from '../types/task'
 import { useProgressStore } from './progressStore'
 
@@ -19,12 +19,15 @@ export interface AnswerResult {
   correct: boolean
   submitted: TaskAnswer
   hintsUsed: number
+  durationMs: number
+  mode: AttemptMode
 }
 
 export const AUTO_SPEED_MIN = 100
 export const AUTO_SPEED_MAX = 1000
 export const DEFAULT_AUTO_SPEED = 500
 export const ANIMATION_PHASE_MS = 220
+export const EXAM_TIMER_TICK_MS = 250
 
 interface SessionState {
   task: Task
@@ -40,6 +43,8 @@ interface SessionState {
   openedHints: number
   attemptStartedAtMs: number
   executedSteps: number
+  mode: AttemptMode
+  elapsedMs: number
   selectTask: (taskId: string) => void
   step: () => void
   undo: () => void
@@ -54,6 +59,9 @@ interface SessionState {
   setAutoSpeed: (speedMs: number) => void
   setReducedMotion: (reduced: boolean) => void
   openNextHint: () => void
+  setMode: (mode: AttemptMode) => void
+  startExamTimer: () => void
+  stopExamTimer: () => void
 }
 
 const initialTask = tasks[0]
@@ -64,6 +72,7 @@ if (initialTask === undefined) {
 
 export const useSessionStore = create<SessionState>((set, get) => {
   let executionTimer: ReturnType<typeof setTimeout> | null = null
+  let examTimer: ReturnType<typeof setInterval> | null = null
 
   function clearExecutionTimer(): void {
     if (executionTimer === null) return
@@ -74,6 +83,27 @@ export const useSessionStore = create<SessionState>((set, get) => {
   function schedule(callback: () => void, delayMs: number): void {
     clearExecutionTimer()
     executionTimer = setTimeout(callback, delayMs)
+  }
+
+  function stopExamTimer(): void {
+    if (examTimer === null) return
+    clearInterval(examTimer)
+    examTimer = null
+  }
+
+  function updateExamElapsed(): void {
+    const { attemptStartedAtMs, mode, result } = get()
+    if (mode !== 'exam' || result !== null) {
+      stopExamTimer()
+      return
+    }
+    set({ elapsedMs: Math.max(0, Date.now() - attemptStartedAtMs) })
+  }
+
+  function startExamTimer(): void {
+    if (examTimer !== null || get().mode !== 'exam' || get().result !== null) return
+    updateExamElapsed()
+    examTimer = setInterval(updateExamElapsed, EXAM_TIMER_TICK_MS)
   }
 
   function stopAuto(): void {
@@ -170,11 +200,14 @@ export const useSessionStore = create<SessionState>((set, get) => {
     openedHints: 0,
     attemptStartedAtMs: Date.now(),
     executedSteps: 0,
+    mode: 'learning',
+    elapsedMs: 0,
 
     selectTask: (taskId) => {
       const task = tasks.find((candidate) => candidate.id === taskId)
       if (task === undefined || task.id === get().task.id) return
       stopAuto()
+      stopExamTimer()
 
       set((state) => ({
         task,
@@ -185,7 +218,9 @@ export const useSessionStore = create<SessionState>((set, get) => {
         openedHints: 0,
         attemptStartedAtMs: Date.now(),
         executedSteps: 0,
+        elapsedMs: 0,
       }))
+      if (get().mode === 'exam') startExamTimer()
     },
 
     step: () => {
@@ -235,6 +270,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         openedHints,
         result,
         task,
+        mode,
       } = get()
       if (animationPhase !== null || result !== null) return
       const submitted = draftToAnswer(draft)
@@ -242,11 +278,13 @@ export const useSessionStore = create<SessionState>((set, get) => {
       stopAuto()
 
       const correct = checkAnswer(task.answer, submitted)
+      const durationMs = Math.max(0, Date.now() - attemptStartedAtMs)
+      stopExamTimer()
       const attempt: AttemptStats = {
         taskId: task.id,
-        mode: 'learning',
+        mode,
         startedAt: new Date(attemptStartedAtMs).toISOString(),
-        durationMs: Math.max(0, Date.now() - attemptStartedAtMs),
+        durationMs,
         correct,
         hintsUsed: openedHints,
         stepsExecuted: executedSteps,
@@ -264,6 +302,8 @@ export const useSessionStore = create<SessionState>((set, get) => {
           correct,
           submitted,
           hintsUsed: openedHints,
+          durationMs,
+          mode,
         },
       })
     },
@@ -271,6 +311,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     retry: () => {
       const { machine, task } = get()
       stopAuto()
+      stopExamTimer()
       machine.reset()
       set((state) => ({
         revision: state.revision + 1,
@@ -279,7 +320,9 @@ export const useSessionStore = create<SessionState>((set, get) => {
         openedHints: 0,
         attemptStartedAtMs: Date.now(),
         executedSteps: 0,
+        elapsedMs: 0,
       }))
+      if (get().mode === 'exam') startExamTimer()
     },
 
     nextTask: () => {
@@ -332,11 +375,38 @@ export const useSessionStore = create<SessionState>((set, get) => {
     },
 
     openNextHint: () => {
-      const { animationPhase, openedHints, result, task } = get()
-      if (animationPhase !== null || result !== null || openedHints >= task.hints.length) return
+      const { animationPhase, mode, openedHints, result, task } = get()
+      if (
+        mode !== 'learning'
+        || animationPhase !== null
+        || result !== null
+        || openedHints >= task.hints.length
+      ) return
       stopAuto()
       set({ openedHints: openedHints + 1 })
     },
+
+    setMode: (mode) => {
+      if (get().mode === mode) return
+      const { machine, task } = get()
+      stopAuto()
+      stopExamTimer()
+      machine.reset()
+      set((state) => ({
+        mode,
+        elapsedMs: 0,
+        attemptStartedAtMs: Date.now(),
+        executedSteps: 0,
+        revision: state.revision + 1,
+        draft: createDraft(task),
+        result: null,
+        openedHints: 0,
+      }))
+      if (mode === 'exam') startExamTimer()
+    },
+
+    startExamTimer,
+    stopExamTimer,
   }
 })
 

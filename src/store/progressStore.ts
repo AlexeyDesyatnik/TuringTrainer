@@ -75,7 +75,9 @@ export function getSkillStatus(
   const taskIds = new Set(
     tasks.filter((task) => task.skills.includes(skill)).map((task) => task.id),
   )
-  const relevant = attempts.filter((attempt) => taskIds.has(attempt.taskId))
+  const relevant = attempts.filter(
+    (attempt) => attempt.mode === 'learning' && taskIds.has(attempt.taskId),
+  )
 
   if (relevant.length === 0) return 'not-started'
 

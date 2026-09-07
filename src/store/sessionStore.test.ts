@@ -250,6 +250,7 @@ describe('фиксация статистики попытки', () => {
   beforeEach(() => {
     useProgressStore.getState().clearProgress()
     const store = useSessionStore.getState()
+    store.setMode('learning')
     store.selectTask('l1-command-reading-01')
     store.retry()
     store.setReducedMotion(true)
@@ -296,5 +297,66 @@ describe('фиксация статистики попытки', () => {
     store.submitAnswer()
 
     expect(useProgressStore.getState().attempts).toHaveLength(1)
+  })
+})
+
+describe('экзаменационный режим', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    useProgressStore.getState().clearProgress()
+    const store = useSessionStore.getState()
+    store.setMode('learning')
+    store.selectTask('l1-command-reading-01')
+    store.retry()
+    store.setReducedMotion(true)
+    store.setMode('exam')
+  })
+
+  afterEach(() => {
+    const store = useSessionStore.getState()
+    store.stopAuto()
+    store.stopExamTimer()
+    store.setMode('learning')
+    vi.clearAllTimers()
+    vi.useRealTimers()
+  })
+
+  it('обновляет таймер и запрещает подсказки', () => {
+    useSessionStore.getState().openNextHint()
+    vi.advanceTimersByTime(1250)
+
+    expect(useSessionStore.getState().openedHints).toBe(0)
+    expect(useSessionStore.getState().elapsedMs).toBe(1250)
+    expect(vi.getTimerCount()).toBe(1)
+  })
+
+  it('останавливает таймер и сохраняет режим после ответа', () => {
+    vi.advanceTimersByTime(1250)
+    const store = useSessionStore.getState()
+    store.setChoice('write-1-right-q1')
+    store.submitAnswer()
+    vi.advanceTimersByTime(2000)
+
+    expect(useSessionStore.getState().elapsedMs).toBe(1250)
+    expect(useSessionStore.getState().result).toMatchObject({
+      mode: 'exam',
+      durationMs: 1250,
+      hintsUsed: 0,
+    })
+    expect(useProgressStore.getState().attempts[0]).toMatchObject({
+      mode: 'exam',
+      durationMs: 1250,
+      hintsUsed: 0,
+    })
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('начинает новый отсчёт при повторной попытке', () => {
+    vi.advanceTimersByTime(1000)
+    useSessionStore.getState().retry()
+
+    expect(useSessionStore.getState().elapsedMs).toBe(0)
+    vi.advanceTimersByTime(500)
+    expect(useSessionStore.getState().elapsedMs).toBe(500)
   })
 })

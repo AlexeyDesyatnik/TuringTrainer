@@ -64,8 +64,10 @@ describe('статус освоения навыка', () => {
       taskId: 'l1-prediction-01',
       correct: true,
     }
+    const examSuccess: AttemptStats = { ...independent, mode: 'exam' }
 
     expect(getSkillStatus([], 'machine-mechanics')).toBe('not-started')
+    expect(getSkillStatus([examSuccess], 'machine-mechanics')).toBe('not-started')
     expect(getSkillStatus([wrong], 'machine-mechanics')).toBe('attempted')
     expect(getSkillStatus([supported], 'machine-mechanics')).toBe('solves')
     expect(getSkillStatus([independent], 'machine-mechanics')).toBe('independent')

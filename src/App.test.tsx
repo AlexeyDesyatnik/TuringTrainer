@@ -8,6 +8,7 @@ import { useProgressStore } from './store/progressStore'
 describe('экран учебной задачи', () => {
   beforeEach(() => {
     useProgressStore.getState().clearProgress()
+    useSessionStore.getState().setMode('learning')
     useSessionStore.getState().selectTask('l1-command-reading-01')
     useSessionStore.getState().retry()
     useSessionStore.getState().setReducedMotion(true)
@@ -15,6 +16,7 @@ describe('экран учебной задачи', () => {
 
   afterEach(() => {
     useSessionStore.getState().stopAuto()
+    useSessionStore.getState().stopExamTimer()
     vi.useRealTimers()
   })
 
@@ -151,5 +153,25 @@ describe('экран учебной задачи', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Решить ещё раз' }))
     expect(screen.queryByText(/Какое состояние активно/)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Открыть подсказку 1 из 3' })).toBeInTheDocument()
+  })
+
+  it('ведёт экзаменационный таймер и сохраняет попытку отдельно', () => {
+    vi.useFakeTimers()
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Экзаменационный' }))
+    expect(screen.getByText('В экзаменационном режиме подсказки недоступны.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Открыть подсказку/ })).not.toBeInTheDocument()
+
+    act(() => vi.advanceTimersByTime(1100))
+    expect(screen.getByLabelText('Состояние машины')).toHaveTextContent('Таймер 00:01')
+
+    fireEvent.click(screen.getByLabelText('Записать 1, сдвинуться вправо, перейти в q1'))
+    fireEvent.click(screen.getByRole('button', { name: 'Проверить ответ' }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Режим и время: экзаменационный, 00:01')
+    expect(screen.getByLabelText('Сохранённый прогресс')).toHaveTextContent('экзамен: 1')
+    act(() => vi.advanceTimersByTime(2000))
+    expect(useSessionStore.getState().elapsedMs).toBe(1000)
   })
 })
