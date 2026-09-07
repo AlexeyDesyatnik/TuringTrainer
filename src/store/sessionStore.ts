@@ -16,6 +16,7 @@ export type AnimationPhase = 'write' | 'move' | 'state' | null
 export interface AnswerResult {
   correct: boolean
   submitted: TaskAnswer
+  hintsUsed: number
 }
 
 export const AUTO_SPEED_MIN = 100
@@ -34,6 +35,7 @@ interface SessionState {
   animationPhase: AnimationPhase
   animatedStep: StepResult | null
   reducedMotion: boolean
+  openedHints: number
   selectTask: (taskId: string) => void
   step: () => void
   undo: () => void
@@ -47,6 +49,7 @@ interface SessionState {
   stopAuto: () => void
   setAutoSpeed: (speedMs: number) => void
   setReducedMotion: (reduced: boolean) => void
+  openNextHint: () => void
 }
 
 const initialTask = tasks[0]
@@ -159,6 +162,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     animationPhase: null,
     animatedStep: null,
     reducedMotion: false,
+    openedHints: 0,
 
     selectTask: (taskId) => {
       const task = tasks.find((candidate) => candidate.id === taskId)
@@ -171,6 +175,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         revision: state.revision + 1,
         draft: createDraft(task),
         result: null,
+        openedHints: 0,
       }))
     },
 
@@ -212,7 +217,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     },
 
     submitAnswer: () => {
-      const { animationPhase, draft, machine, result, task } = get()
+      const { animationPhase, draft, machine, openedHints, result, task } = get()
       if (animationPhase !== null || result !== null) return
       const submitted = draftToAnswer(draft)
       if (submitted === null) return
@@ -222,10 +227,26 @@ export const useSessionStore = create<SessionState>((set, get) => {
         performLogicalStep()
       }
 
-      set({ result: { correct: checkAnswer(task.answer, submitted), submitted } })
+      set({
+        result: {
+          correct: checkAnswer(task.answer, submitted),
+          submitted,
+          hintsUsed: openedHints,
+        },
+      })
     },
 
-    retry: () => get().reset(),
+    retry: () => {
+      const { machine, task } = get()
+      stopAuto()
+      machine.reset()
+      set((state) => ({
+        revision: state.revision + 1,
+        draft: createDraft(task),
+        result: null,
+        openedHints: 0,
+      }))
+    },
 
     nextTask: () => {
       const currentIndex = tasks.findIndex((task) => task.id === get().task.id)
@@ -274,6 +295,13 @@ export const useSessionStore = create<SessionState>((set, get) => {
       if (reduced && get().animationPhase !== null) {
         finishVisualStep()
       }
+    },
+
+    openNextHint: () => {
+      const { animationPhase, openedHints, result, task } = get()
+      if (animationPhase !== null || result !== null || openedHints >= task.hints.length) return
+      stopAuto()
+      set({ openedHints: openedHints + 1 })
     },
   }
 })

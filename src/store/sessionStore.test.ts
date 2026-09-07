@@ -13,7 +13,7 @@ describe('автозапуск сессии', () => {
     vi.useFakeTimers()
     const store = useSessionStore.getState()
     store.selectTask('l1-command-reading-01')
-    store.reset()
+    store.retry()
     store.setAutoSpeed(DEFAULT_AUTO_SPEED)
     store.setReducedMotion(true)
   })
@@ -110,7 +110,7 @@ describe('трёхфазная анимация', () => {
     vi.useFakeTimers()
     const store = useSessionStore.getState()
     store.selectTask('l1-command-reading-01')
-    store.reset()
+    store.retry()
     store.setAutoSpeed(DEFAULT_AUTO_SPEED)
     store.setReducedMotion(false)
   })
@@ -190,5 +190,57 @@ describe('трёхфазная анимация', () => {
     expect(useSessionStore.getState().autoRunning).toBe(false)
     expect(useSessionStore.getState().machine.getStepCount()).toBe(1)
     expect(vi.getTimerCount()).toBe(0)
+  })
+})
+
+describe('подсказки текущей попытки', () => {
+  beforeEach(() => {
+    const store = useSessionStore.getState()
+    store.selectTask('l1-command-reading-01')
+    store.retry()
+    store.setReducedMotion(true)
+  })
+
+  afterEach(() => useSessionStore.getState().stopAuto())
+
+  it('открывает не больше трёх подсказок строго по порядку', () => {
+    const store = useSessionStore.getState()
+
+    store.openNextHint()
+    expect(useSessionStore.getState().openedHints).toBe(1)
+    store.openNextHint()
+    store.openNextHint()
+    store.openNextHint()
+
+    expect(useSessionStore.getState().openedHints).toBe(3)
+  })
+
+  it('сохраняет помощь при reset и очищает при новой попытке', () => {
+    useSessionStore.getState().openNextHint()
+    useSessionStore.getState().reset()
+    expect(useSessionStore.getState().openedHints).toBe(1)
+
+    useSessionStore.getState().retry()
+    expect(useSessionStore.getState().openedHints).toBe(0)
+  })
+
+  it('фиксирует число подсказок в результате независимо от правильности', () => {
+    const store = useSessionStore.getState()
+    store.openNextHint()
+    store.openNextHint()
+    store.setChoice('write-1-right-q1')
+    store.submitAnswer()
+
+    expect(useSessionStore.getState().result).toMatchObject({
+      correct: true,
+      hintsUsed: 2,
+    })
+  })
+
+  it('очищает подсказки при смене задачи', () => {
+    useSessionStore.getState().openNextHint()
+    useSessionStore.getState().selectTask('l1-prediction-01')
+
+    expect(useSessionStore.getState().openedHints).toBe(0)
   })
 })

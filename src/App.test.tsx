@@ -7,7 +7,7 @@ import { ANIMATION_PHASE_MS, useSessionStore } from './store/sessionStore'
 describe('экран учебной задачи', () => {
   beforeEach(() => {
     useSessionStore.getState().selectTask('l1-command-reading-01')
-    useSessionStore.getState().reset()
+    useSessionStore.getState().retry()
     useSessionStore.getState().setReducedMotion(true)
   })
 
@@ -124,5 +124,28 @@ describe('экран учебной задачи', () => {
 
     act(() => vi.advanceTimersByTime(ANIMATION_PHASE_MS))
     expect(screen.queryByTestId('animation-phase')).not.toBeInTheDocument()
+  })
+
+  it('открывает подсказки последовательно и отдельно показывает самостоятельность', () => {
+    render(<App />)
+
+    expect(screen.queryByText(/Какое состояние активно/)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Открыть подсказку 1 из 3' }))
+    expect(screen.getByText(/Какое состояние активно/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Открыть подсказку 2 из 3' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Сбросить машину' }))
+    expect(screen.getByText(/Какое состояние активно/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Открыть подсказку 2 из 3' }))
+
+    fireEvent.click(screen.getByLabelText('Записать 1, сдвинуться вправо, перейти в q1'))
+    fireEvent.click(screen.getByRole('button', { name: 'Проверить ответ' }))
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Самостоятельность: с поддержкой, подсказок использовано: 2',
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Решить ещё раз' }))
+    expect(screen.queryByText(/Какое состояние активно/)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Открыть подсказку 1 из 3' })).toBeInTheDocument()
   })
 })

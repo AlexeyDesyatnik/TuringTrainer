@@ -201,7 +201,7 @@ export function TaskScreen() {
                 >
                   {autoRunning ? 'Пауза' : 'Авто'}
                 </button>
-                <button className={`${secondaryButton} col-span-2`} onClick={reset} type="button">
+                <button className={`${secondaryButton} col-span-2`} disabled={result !== null} onClick={reset} type="button">
                   Сбросить машину
                 </button>
               </div>
@@ -229,12 +229,56 @@ export function TaskScreen() {
                 </p>
               )}
             </section>
+            <HintPanel task={task} animationActive={animationPhase !== null} />
           </aside>
         </div>
 
         <AnswerPanel task={task} draft={draft} animationActive={animationPhase !== null} />
       </div>
     </main>
+  )
+}
+
+function HintPanel({ task, animationActive }: { task: Task; animationActive: boolean }) {
+  const openedHints = useSessionStore((state) => state.openedHints)
+  const result = useSessionStore((state) => state.result)
+  const openNextHint = useSessionStore((state) => state.openNextHint)
+  const allHintsOpened = openedHints === task.hints.length
+
+  return (
+    <section aria-labelledby="hints-heading" className="rounded-2xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
+      <p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-800">Поддержка</p>
+      <h3 id="hints-heading" className="mt-1 text-lg font-black text-slate-950">Подсказки</h3>
+      <p className="mt-2 text-sm leading-6 text-slate-600">
+        Помощь не снижает правильность, но учитывается отдельно.
+      </p>
+
+      {openedHints > 0 && (
+        <ol className="mt-4 space-y-3">
+          {task.hints.slice(0, openedHints).map((hint, index) => (
+            <li className="rounded-xl border border-amber-200 bg-white p-3 text-sm leading-6 text-slate-700" key={hint}>
+              <strong className="mr-2 text-amber-800">{index + 1}.</strong>
+              {hint}
+            </li>
+          ))}
+        </ol>
+      )}
+
+      {!allHintsOpened && result === null && (
+        <button
+          className={`${secondaryButton} mt-4 w-full`}
+          disabled={animationActive}
+          onClick={openNextHint}
+          type="button"
+        >
+          Открыть подсказку {openedHints + 1} из {task.hints.length}
+        </button>
+      )}
+
+      {allHintsOpened && (
+        <p className="mt-4 text-sm font-semibold text-amber-900">Все три подсказки открыты.</p>
+      )}
+    </section>
   )
 }
 
@@ -407,6 +451,14 @@ function AnswerPanel({ task, draft, animationActive }: {
             <dl className="mt-3 grid gap-2 text-sm leading-6 text-slate-700">
               <div><dt className="inline font-bold">Твой ответ: </dt><dd className="inline">{formatAnswer(task, result.submitted)}</dd></div>
               <div><dt className="inline font-bold">Правильный ответ: </dt><dd className="inline">{formatAnswer(task, task.answer)}</dd></div>
+              <div>
+                <dt className="inline font-bold">Самостоятельность: </dt>
+                <dd className="inline">
+                  {result.hintsUsed === 0
+                    ? 'самостоятельно, без подсказок'
+                    : `с поддержкой, подсказок использовано: ${result.hintsUsed}`}
+                </dd>
+              </div>
             </dl>
             <p className="mt-3 text-sm leading-6 text-slate-700">{task.explanation}</p>
             <div className="mt-5 flex flex-wrap gap-2">
