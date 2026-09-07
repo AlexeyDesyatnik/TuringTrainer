@@ -1,7 +1,14 @@
+import { useEffect } from 'react'
+
 import { makeCommandKey } from '../core/commandKey'
 import { EMPTY_SYMBOL } from '../core/TuringMachine'
 import { tasks } from '../data/tasks'
-import { useSessionStore, type AnswerDraft } from '../store/sessionStore'
+import {
+  AUTO_SPEED_MAX,
+  AUTO_SPEED_MIN,
+  useSessionStore,
+  type AnswerDraft,
+} from '../store/sessionStore'
 import type { Direction, HaltReason } from '../types/machine'
 import type { Task, TaskAnswer } from '../types/task'
 
@@ -18,10 +25,17 @@ export function TaskScreen() {
   const revision = useSessionStore((state) => state.revision)
   const draft = useSessionStore((state) => state.draft)
   const result = useSessionStore((state) => state.result)
+  const autoRunning = useSessionStore((state) => state.autoRunning)
+  const autoSpeedMs = useSessionStore((state) => state.autoSpeedMs)
   const selectTask = useSessionStore((state) => state.selectTask)
   const step = useSessionStore((state) => state.step)
   const undo = useSessionStore((state) => state.undo)
   const reset = useSessionStore((state) => state.reset)
+  const toggleAuto = useSessionStore((state) => state.toggleAuto)
+  const stopAuto = useSessionStore((state) => state.stopAuto)
+  const setAutoSpeed = useSessionStore((state) => state.setAutoSpeed)
+
+  useEffect(() => stopAuto, [stopAuto])
 
   const headPosition = machine.getHeadPosition()
   const state = machine.getState()
@@ -131,21 +145,42 @@ export function TaskScreen() {
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Управление</p>
               <h3 id="controls-heading" className="mt-1 text-lg font-black">Выполнение</h3>
               <div className="mt-5 grid grid-cols-2 gap-2">
-                <button className={secondaryButton} disabled={stepCount === 0 || result !== null} onClick={undo} type="button">
+                <button className={secondaryButton} disabled={stepCount === 0 || result !== null || autoRunning} onClick={undo} type="button">
                   Шаг назад
                 </button>
                 <button
                   className={primaryButton}
-                  disabled={machine.isHalted() || predictionPending || result !== null}
+                  disabled={machine.isHalted() || predictionPending || result !== null || autoRunning}
                   onClick={step}
                   type="button"
                 >
                   Шаг вперёд
                 </button>
+                <button
+                  className={`${autoRunning ? primaryButton : secondaryButton} col-span-2`}
+                  disabled={!autoRunning && (machine.isHalted() || predictionPending || result !== null)}
+                  onClick={toggleAuto}
+                  type="button"
+                >
+                  {autoRunning ? 'Пауза' : 'Авто'}
+                </button>
                 <button className={`${secondaryButton} col-span-2`} onClick={reset} type="button">
                   Сбросить машину
                 </button>
               </div>
+              <label className="mt-5 block text-sm font-semibold text-slate-200">
+                Скорость: {autoSpeedMs} мс
+                <input
+                  aria-label="Скорость автозапуска"
+                  className="mt-3 block w-full accent-amber-300"
+                  max={AUTO_SPEED_MAX}
+                  min={AUTO_SPEED_MIN}
+                  onChange={(event) => setAutoSpeed(Number(event.target.value))}
+                  step="100"
+                  type="range"
+                  value={autoSpeedMs}
+                />
+              </label>
               {predictionPending && (
                 <p className="mt-4 text-sm leading-6 text-amber-200">
                   Сначала отправь прогноз. После этого машина выполнит шаг.

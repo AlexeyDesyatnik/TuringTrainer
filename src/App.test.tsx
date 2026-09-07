@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { App } from './App'
 import { useSessionStore } from './store/sessionStore'
@@ -8,6 +8,11 @@ describe('экран учебной задачи', () => {
   beforeEach(() => {
     useSessionStore.getState().selectTask('l1-command-reading-01')
     useSessionStore.getState().reset()
+  })
+
+  afterEach(() => {
+    useSessionStore.getState().stopAuto()
+    vi.useRealTimers()
   })
 
   it('показывает условие, 15 ячеек и активную команду', () => {
@@ -78,5 +83,20 @@ describe('экран учебной задачи', () => {
     expect(screen.getByLabelText('Состояние машины')).toHaveTextContent('Состояние check')
     expect(screen.getByLabelText('Направление движения')).toBeDisabled()
     expect(forward).toBeDisabled()
+  })
+
+  it('останавливает автозапуск при размонтировании экрана', () => {
+    vi.useFakeTimers()
+    const { unmount } = render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Авто' }))
+    expect(useSessionStore.getState().autoRunning).toBe(true)
+    expect(screen.getByRole('button', { name: 'Пауза' })).toBeInTheDocument()
+
+    unmount()
+    vi.advanceTimersByTime(2000)
+
+    expect(useSessionStore.getState().autoRunning).toBe(false)
+    expect(useSessionStore.getState().machine.getStepCount()).toBe(1)
   })
 })
