@@ -6,7 +6,7 @@ import { tasks } from '../data/tasks'
 import type { Direction, StepResult } from '../types/machine'
 import type { AttemptMode, AttemptStats, SimulationUsage } from '../types/progress'
 import type { Task, TaskAnswer } from '../types/task'
-import { useProgressStore } from './progressStore'
+import { getNextTask, useProgressStore } from './progressStore'
 
 export type AnswerDraft =
   | { type: 'choice'; value: string }
@@ -14,6 +14,7 @@ export type AnswerDraft =
   | null
 
 export type AnimationPhase = 'write' | 'move' | 'state' | null
+export type AppScreen = 'home' | 'selector' | 'task' | 'dashboard'
 
 export interface AnswerResult {
   correct: boolean
@@ -45,6 +46,7 @@ interface SessionState {
   executedSteps: number
   mode: AttemptMode
   elapsedMs: number
+  screen: AppScreen
   selectTask: (taskId: string) => void
   step: () => void
   undo: () => void
@@ -62,6 +64,8 @@ interface SessionState {
   setMode: (mode: AttemptMode) => void
   startExamTimer: () => void
   stopExamTimer: () => void
+  navigate: (screen: AppScreen) => void
+  openTask: (taskId: string) => void
 }
 
 const initialTask = tasks[0]
@@ -92,8 +96,8 @@ export const useSessionStore = create<SessionState>((set, get) => {
   }
 
   function updateExamElapsed(): void {
-    const { attemptStartedAtMs, mode, result } = get()
-    if (mode !== 'exam' || result !== null) {
+    const { attemptStartedAtMs, mode, result, screen } = get()
+    if (mode !== 'exam' || result !== null || screen !== 'task') {
       stopExamTimer()
       return
     }
@@ -101,7 +105,12 @@ export const useSessionStore = create<SessionState>((set, get) => {
   }
 
   function startExamTimer(): void {
-    if (examTimer !== null || get().mode !== 'exam' || get().result !== null) return
+    if (
+      examTimer !== null
+      || get().mode !== 'exam'
+      || get().result !== null
+      || get().screen !== 'task'
+    ) return
     updateExamElapsed()
     examTimer = setInterval(updateExamElapsed, EXAM_TIMER_TICK_MS)
   }
@@ -202,6 +211,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     executedSteps: 0,
     mode: 'learning',
     elapsedMs: 0,
+    screen: 'home',
 
     selectTask: (taskId) => {
       const task = tasks.find((candidate) => candidate.id === taskId)
@@ -220,7 +230,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         executedSteps: 0,
         elapsedMs: 0,
       }))
-      if (get().mode === 'exam') startExamTimer()
+      if (get().mode === 'exam' && get().screen === 'task') startExamTimer()
     },
 
     step: () => {
@@ -322,13 +332,18 @@ export const useSessionStore = create<SessionState>((set, get) => {
         executedSteps: 0,
         elapsedMs: 0,
       }))
-      if (get().mode === 'exam') startExamTimer()
+      if (get().mode === 'exam' && get().screen === 'task') startExamTimer()
     },
 
     nextTask: () => {
-      const currentIndex = tasks.findIndex((task) => task.id === get().task.id)
-      const next = tasks[(currentIndex + 1) % tasks.length]
-      if (next !== undefined) get().selectTask(next.id)
+      const { attempts } = useProgressStore.getState()
+      const { mode, task } = get()
+      const next = getNextTask(task, attempts, mode)
+      if (next === null) {
+        get().navigate('selector')
+      } else {
+        get().selectTask(next.id)
+      }
     },
 
     toggleAuto: () => {
@@ -402,11 +417,33 @@ export const useSessionStore = create<SessionState>((set, get) => {
         result: null,
         openedHints: 0,
       }))
-      if (mode === 'exam') startExamTimer()
+      if (mode === 'exam' && get().screen === 'task') startExamTimer()
     },
 
     startExamTimer,
     stopExamTimer,
+
+    navigate: (screen) => {
+      if (get().screen === screen) return
+      if (get().screen === 'task') {
+        stopAuto()
+        stopExamTimer()
+      }
+      set({ screen })
+      if (screen === 'task' && get().mode === 'exam' && get().result === null) {
+        startExamTimer()
+      }
+    },
+
+    openTask: (taskId) => {
+      if (get().task.id === taskId) {
+        get().retry()
+      } else {
+        get().selectTask(taskId)
+      }
+      set({ screen: 'task' })
+      if (get().mode === 'exam' && get().result === null) startExamTimer()
+    },
   }
 })
 

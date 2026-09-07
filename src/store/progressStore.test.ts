@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import type { AttemptStats } from '../types/progress'
 import {
+  getNextTask,
+  getRecommendedTask,
   getSkillStatus,
   loadProgress,
   MASTERY_TASK_THRESHOLD,
@@ -10,6 +12,7 @@ import {
   PROGRESS_STORAGE_KEY,
   useProgressStore,
 } from './progressStore'
+import { tasks } from '../data/tasks'
 
 const baseAttempt: AttemptStats = {
   taskId: 'l1-command-reading-01',
@@ -72,5 +75,33 @@ describe('статус освоения навыка', () => {
     expect(getSkillStatus([supported], 'machine-mechanics')).toBe('solves')
     expect(getSkillStatus([independent], 'machine-mechanics')).toBe('independent')
     expect(getSkillStatus([independent, transfer], 'machine-mechanics')).toBe('mastered')
+  })
+})
+
+describe('рекомендации задач', () => {
+  it('сначала предлагает нерешённую, затем несамостоятельную задачу', () => {
+    expect(getRecommendedTask([])?.id).toBe('l1-command-reading-01')
+
+    const supported = { ...baseAttempt, correct: true, hintsUsed: 1 }
+    expect(getRecommendedTask([supported])?.id).toBe('l1-prediction-01')
+
+    const secondSolved: AttemptStats = {
+      ...baseAttempt,
+      taskId: 'l1-prediction-01',
+      correct: true,
+    }
+    expect(getRecommendedTask([supported, secondSolved])?.id).toBe('l1-command-reading-01')
+  })
+
+  it('выбирает следующую нерешённую задачу того же уровня', () => {
+    const current = tasks[0]
+    if (current === undefined) throw new Error('Нет тестовой задачи')
+
+    expect(getNextTask(current, [], 'learning')?.id).toBe('l1-prediction-01')
+    expect(getNextTask(current, [{
+      ...baseAttempt,
+      taskId: 'l1-prediction-01',
+      correct: true,
+    }], 'learning')).toBeNull()
   })
 })

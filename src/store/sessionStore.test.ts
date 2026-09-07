@@ -309,6 +309,7 @@ describe('экзаменационный режим', () => {
     store.selectTask('l1-command-reading-01')
     store.retry()
     store.setReducedMotion(true)
+    store.navigate('task')
     store.setMode('exam')
   })
 

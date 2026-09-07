@@ -2,6 +2,7 @@ import { create } from 'zustand'
 
 import { tasks } from '../data/tasks'
 import type { AttemptStats, SkillStatus, StoredProgress } from '../types/progress'
+import type { Task } from '../types/task'
 
 export const PROGRESS_SCHEMA_VERSION = 1
 export const PROGRESS_STORAGE_KEY = 'turing-trainer-progress'
@@ -91,6 +92,43 @@ export function getSkillStatus(
   if (independentTaskIds.size > 0) return 'independent'
   if (relevant.some((attempt) => attempt.correct)) return 'solves'
   return 'attempted'
+}
+
+export function getRecommendedTask(attempts: AttemptStats[]): Task | null {
+  const learningAttempts = attempts.filter((attempt) => attempt.mode === 'learning')
+  const solvedTaskIds = new Set(
+    learningAttempts.filter((attempt) => attempt.correct).map((attempt) => attempt.taskId),
+  )
+  const independentTaskIds = new Set(
+    learningAttempts
+      .filter((attempt) => attempt.correct && attempt.hintsUsed === 0)
+      .map((attempt) => attempt.taskId),
+  )
+
+  return tasks.find((task) => !solvedTaskIds.has(task.id))
+    ?? tasks.find((task) => !independentTaskIds.has(task.id))
+    ?? null
+}
+
+export function getNextTask(
+  currentTask: Task,
+  attempts: AttemptStats[],
+  mode: AttemptStats['mode'],
+): Task | null {
+  const solvedTaskIds = new Set(
+    attempts
+      .filter((attempt) => attempt.mode === mode && attempt.correct)
+      .map((attempt) => attempt.taskId),
+  )
+  const unresolved = tasks.filter(
+    (task) => task.id !== currentTask.id && !solvedTaskIds.has(task.id),
+  )
+  const primarySkill = currentTask.skills[0]
+
+  return unresolved.find((task) => primarySkill !== undefined && task.skills.includes(primarySkill))
+    ?? unresolved.find((task) => task.level === currentTask.level)
+    ?? unresolved[0]
+    ?? null
 }
 
 function saveProgress(storage: Storage | null, progress: StoredProgress): void {

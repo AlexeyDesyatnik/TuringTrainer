@@ -44,6 +44,7 @@ export function TaskScreen() {
   const setMode = useSessionStore((state) => state.setMode)
   const startExamTimer = useSessionStore((state) => state.startExamTimer)
   const stopExamTimer = useSessionStore((state) => state.stopExamTimer)
+  const navigate = useSessionStore((state) => state.navigate)
 
   useEffect(() => stopAuto, [stopAuto])
 
@@ -90,6 +91,11 @@ export function TaskScreen() {
             <h1 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">
               Машина Тьюринга
             </h1>
+            <nav aria-label="Разделы приложения" className="mt-3 flex flex-wrap gap-3 text-xs font-bold text-slate-300">
+              <button className="hover:text-white hover:underline" onClick={() => navigate('home')} type="button">Главная</button>
+              <button className="hover:text-white hover:underline" onClick={() => navigate('selector')} type="button">Все задачи</button>
+              <button className="hover:text-white hover:underline" onClick={() => navigate('dashboard')} type="button">Прогресс</button>
+            </nav>
           </div>
           <div className="min-w-0">
             <nav aria-label="Учебные задачи" className="flex gap-2 overflow-x-auto pb-1">

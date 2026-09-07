@@ -12,6 +12,7 @@ describe('экран учебной задачи', () => {
     useSessionStore.getState().selectTask('l1-command-reading-01')
     useSessionStore.getState().retry()
     useSessionStore.getState().setReducedMotion(true)
+    useSessionStore.getState().navigate('task')
   })
 
   afterEach(() => {
