@@ -69,7 +69,7 @@ describe('экран учебной задачи', () => {
     expect(result).toHaveTextContent('Попытка сохранена на этом устройстве')
     expect(screen.getByLabelText('Сохранённый прогресс')).toHaveTextContent('Попыток: 1')
 
-    fireEvent.click(within(result).getByRole('button', { name: 'Решить ещё раз' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Решить ещё раз' }))
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
@@ -254,5 +254,33 @@ describe('экран учебной задачи', () => {
 
     expect(screen.getByRole('alert')).toHaveTextContent('Верно')
     expect(screen.getByRole('alert')).toHaveTextContent('[0…15] 1101001100101101')
+  })
+
+  it('удерживает фокус в модальном результате и возвращает его к ответу', () => {
+    render(<App />)
+    fireEvent.click(screen.getByLabelText('Записать 1, сдвинуться вправо, перейти в q1'))
+    const submit = screen.getByRole('button', { name: 'Проверить ответ' })
+    submit.focus()
+    fireEvent.click(submit)
+
+    const dialog = screen.getByRole('dialog', { name: 'Верно' })
+    const title = within(dialog).getByRole('heading', { name: 'Верно' })
+    const retry = within(dialog).getByRole('button', { name: 'Решить ещё раз' })
+    const next = within(dialog).getByRole('button', { name: 'Следующая задача' })
+    expect(title).toHaveFocus()
+    expect(document.body.style.overflow).toBe('hidden')
+
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
+    expect(next).toHaveFocus()
+    fireEvent.keyDown(document, { key: 'Tab' })
+    expect(retry).toHaveFocus()
+    retry.focus()
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
+    expect(next).toHaveFocus()
+
+    fireEvent.click(retry)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Выбери команду' })).toHaveFocus()
+    expect(document.body.style.overflow).toBe('')
   })
 })

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 
 import { makeCommandKey } from '../core/commandKey'
 import { parseTapeInput } from '../core/parseTapeInput'
@@ -9,6 +9,7 @@ import {
   AUTO_SPEED_MIN,
   useSessionStore,
   type AnswerDraft,
+  type AnswerResult,
   type AnimationPhase,
 } from '../store/sessionStore'
 import type { Direction, HaltReason, StepResult } from '../types/machine'
@@ -423,7 +424,7 @@ function AnswerPanel({ task, draft, animationActive }: {
     <section aria-labelledby="answer-heading" className="mt-6 rounded-3xl border border-violet-200 bg-white p-5 shadow-sm sm:p-7">
       <div className="max-w-4xl">
         <p className="text-xs font-bold uppercase tracking-[0.16em] text-violet-700">Твой ответ</p>
-        <h3 id="answer-heading" className="mt-1 text-2xl font-black text-slate-950">
+        <h3 id="answer-heading" className="mt-1 text-2xl font-black text-slate-950 outline-none" tabIndex={-1}>
           {answerHeading(task.answer)}
         </h3>
 
@@ -574,15 +575,92 @@ function AnswerPanel({ task, draft, animationActive }: {
         </button>
 
         {result !== null && (
-          <div
-            aria-live="assertive"
-            className={`mt-6 rounded-2xl border-l-4 p-5 ${result.correct ? 'border-emerald-500 bg-emerald-50' : 'border-rose-500 bg-rose-50'}`}
-            role="alert"
-          >
-            <p className={`text-lg font-black ${result.correct ? 'text-emerald-900' : 'text-rose-900'}`}>
+          <ResultDialog
+            nextTask={nextTask}
+            result={result}
+            retry={retry}
+            task={task}
+          />
+        )}
+      </div>
+    </section>
+  )
+}
+
+function ResultDialog({ nextTask, result, retry, task }: {
+  nextTask: () => void
+  result: AnswerResult
+  retry: () => void
+  task: Task
+}) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const titleRef = useRef<HTMLHeadingElement>(null)
+
+  useEffect(() => {
+    const previouslyFocused = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    titleRef.current?.focus()
+
+    const trapFocus = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return
+      const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      )
+      if (focusable === undefined || focusable.length === 0) return
+
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      const active = document.activeElement
+      const activeIndex = Array.from(focusable).findIndex((element) => element === active)
+
+      if (event.shiftKey && (active === first || activeIndex === -1)) {
+        event.preventDefault()
+        last?.focus()
+      } else if (!event.shiftKey && (active === last || activeIndex === -1)) {
+        event.preventDefault()
+        first?.focus()
+      }
+    }
+
+    document.addEventListener('keydown', trapFocus)
+    return () => {
+      document.removeEventListener('keydown', trapFocus)
+      document.body.style.overflow = previousOverflow
+      const previousIsDisabled = previouslyFocused instanceof HTMLButtonElement
+        && previouslyFocused.disabled
+      if (previouslyFocused?.isConnected && !previousIsDisabled) {
+        previouslyFocused.focus()
+      } else {
+        document.getElementById('answer-heading')?.focus()
+      }
+    }
+  }, [])
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/75 p-4 backdrop-blur-sm sm:p-8">
+      <div className="flex min-h-full items-center justify-center">
+        <div
+          aria-describedby="result-explanation"
+          aria-labelledby="result-title"
+          aria-modal="true"
+          className={`w-full max-w-2xl rounded-3xl border-t-8 bg-white p-5 shadow-2xl sm:p-8 ${result.correct ? 'border-emerald-500' : 'border-rose-500'}`}
+          ref={dialogRef}
+          role="dialog"
+        >
+          <div aria-live="assertive" role="alert">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Результат попытки</p>
+            <h2
+              className={`mt-2 text-3xl font-black outline-none ${result.correct ? 'text-emerald-900' : 'text-rose-900'}`}
+              id="result-title"
+              ref={titleRef}
+              tabIndex={-1}
+            >
               {result.correct ? 'Верно' : 'Пока неверно'}
-            </p>
-            <dl className="mt-3 grid gap-2 text-sm leading-6 text-slate-700">
+            </h2>
+            <dl className="mt-5 grid gap-2 text-sm leading-6 text-slate-700">
               <div><dt className="inline font-bold">Твой ответ: </dt><dd className="inline">{formatAnswer(task, result.submitted)}</dd></div>
               <div><dt className="inline font-bold">Правильный ответ: </dt><dd className="inline">{formatAnswer(task, task.answer)}</dd></div>
               <div>
@@ -600,9 +678,9 @@ function AnswerPanel({ task, draft, animationActive }: {
                 </dd>
               </div>
             </dl>
-            <p className="mt-3 text-sm leading-6 text-slate-700">{task.explanation}</p>
+            <p className="mt-4 text-sm leading-6 text-slate-700" id="result-explanation">{task.explanation}</p>
             {result.errors.length > 0 && (
-              <div className="mt-4 rounded-xl border border-rose-200 bg-white/70 p-4 text-sm leading-6 text-slate-700">
+              <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-slate-700">
                 <p className="font-bold text-rose-900">Диагностика решения</p>
                 {result.errors.map((error) => (
                   <p className="mt-1" key={error}>{mistakeDescription(task, error)}</p>
@@ -612,17 +690,17 @@ function AnswerPanel({ task, draft, animationActive }: {
                 </p>
               </div>
             )}
-            <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
               Попытка сохранена на этом устройстве
             </p>
-            <div className="mt-5 flex flex-wrap gap-2">
-              <button className={secondaryButton} onClick={retry} type="button">Решить ещё раз</button>
-              <button className={primaryButton} onClick={nextTask} type="button">Следующая задача</button>
-            </div>
           </div>
-        )}
+          <div className="mt-6 flex flex-wrap gap-2">
+            <button className={secondaryButton} onClick={retry} type="button">Решить ещё раз</button>
+            <button className={primaryButton} onClick={nextTask} type="button">Следующая задача</button>
+          </div>
+        </div>
       </div>
-    </section>
+    </div>
   )
 }
 
