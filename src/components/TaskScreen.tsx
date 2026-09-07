@@ -12,6 +12,7 @@ import {
 } from '../store/sessionStore'
 import type { Direction, HaltReason, StepResult } from '../types/machine'
 import type { Task, TaskAnswer } from '../types/task'
+import { useProgressStore } from '../store/progressStore'
 
 const primaryButton =
   'rounded-xl bg-slate-950 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-violet-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500'
@@ -80,22 +81,25 @@ export function TaskScreen() {
               Машина Тьюринга
             </h1>
           </div>
-          <nav aria-label="Учебные задачи" className="flex gap-2 overflow-x-auto pb-1">
-            {tasks.map((item, index) => (
-              <button
-                className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 ${
-                  item.id === task.id
-                    ? 'border-amber-300 bg-amber-300 text-slate-950'
-                    : 'border-slate-600 text-slate-200 hover:border-slate-300'
-                }`}
-                key={item.id}
-                onClick={() => selectTask(item.id)}
-                type="button"
-              >
-                {index + 1}. {item.title}
-              </button>
-            ))}
-          </nav>
+          <div className="min-w-0">
+            <nav aria-label="Учебные задачи" className="flex gap-2 overflow-x-auto pb-1">
+              {tasks.map((item, index) => (
+                <button
+                  className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 ${
+                    item.id === task.id
+                      ? 'border-amber-300 bg-amber-300 text-slate-950'
+                      : 'border-slate-600 text-slate-200 hover:border-slate-300'
+                  }`}
+                  key={item.id}
+                  onClick={() => selectTask(item.id)}
+                  type="button"
+                >
+                  {index + 1}. {item.title}
+                </button>
+              ))}
+            </nav>
+            <ProgressSummary />
+          </div>
         </div>
       </header>
 
@@ -236,6 +240,20 @@ export function TaskScreen() {
         <AnswerPanel task={task} draft={draft} animationActive={animationPhase !== null} />
       </div>
     </main>
+  )
+}
+
+function ProgressSummary() {
+  const attempts = useProgressStore((state) => state.attempts)
+  const correct = attempts.filter((attempt) => attempt.correct).length
+  const independent = attempts.filter(
+    (attempt) => attempt.correct && attempt.hintsUsed === 0,
+  ).length
+
+  return (
+    <p aria-label="Сохранённый прогресс" className="mt-2 text-right font-mono text-xs text-slate-400">
+      Попыток: {attempts.length} · верно: {correct} · самостоятельно: {independent}
+    </p>
   )
 }
 
@@ -461,6 +479,9 @@ function AnswerPanel({ task, draft, animationActive }: {
               </div>
             </dl>
             <p className="mt-3 text-sm leading-6 text-slate-700">{task.explanation}</p>
+            <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Попытка сохранена на этом устройстве
+            </p>
             <div className="mt-5 flex flex-wrap gap-2">
               <button className={secondaryButton} onClick={retry} type="button">Решить ещё раз</button>
               <button className={primaryButton} onClick={nextTask} type="button">Следующая задача</button>

@@ -4,7 +4,9 @@ import { checkAnswer } from '../core/checkAnswer'
 import { TuringMachine } from '../core/TuringMachine'
 import { tasks } from '../data/tasks'
 import type { Direction, StepResult } from '../types/machine'
+import type { AttemptStats, SimulationUsage } from '../types/progress'
 import type { Task, TaskAnswer } from '../types/task'
+import { useProgressStore } from './progressStore'
 
 export type AnswerDraft =
   | { type: 'choice'; value: string }
@@ -36,6 +38,8 @@ interface SessionState {
   animatedStep: StepResult | null
   reducedMotion: boolean
   openedHints: number
+  attemptStartedAtMs: number
+  executedSteps: number
   selectTask: (taskId: string) => void
   step: () => void
   undo: () => void
@@ -126,6 +130,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
 
     set((state) => ({
       revision: state.revision + 1,
+      executedSteps: state.executedSteps + 1,
       animationPhase: shouldAnimate ? 'write' : null,
       animatedStep: shouldAnimate ? stepResult : null,
       autoRunning: shouldAnimate
@@ -163,6 +168,8 @@ export const useSessionStore = create<SessionState>((set, get) => {
     animatedStep: null,
     reducedMotion: false,
     openedHints: 0,
+    attemptStartedAtMs: Date.now(),
+    executedSteps: 0,
 
     selectTask: (taskId) => {
       const task = tasks.find((candidate) => candidate.id === taskId)
@@ -176,6 +183,8 @@ export const useSessionStore = create<SessionState>((set, get) => {
         draft: createDraft(task),
         result: null,
         openedHints: 0,
+        attemptStartedAtMs: Date.now(),
+        executedSteps: 0,
       }))
     },
 
@@ -217,11 +226,34 @@ export const useSessionStore = create<SessionState>((set, get) => {
     },
 
     submitAnswer: () => {
-      const { animationPhase, draft, machine, openedHints, result, task } = get()
+      const {
+        animationPhase,
+        attemptStartedAtMs,
+        draft,
+        executedSteps,
+        machine,
+        openedHints,
+        result,
+        task,
+      } = get()
       if (animationPhase !== null || result !== null) return
       const submitted = draftToAnswer(draft)
       if (submitted === null) return
       stopAuto()
+
+      const correct = checkAnswer(task.answer, submitted)
+      const attempt: AttemptStats = {
+        taskId: task.id,
+        mode: 'learning',
+        startedAt: new Date(attemptStartedAtMs).toISOString(),
+        durationMs: Math.max(0, Date.now() - attemptStartedAtMs),
+        correct,
+        hintsUsed: openedHints,
+        stepsExecuted: executedSteps,
+        simulationUsage: getSimulationUsage(executedSteps, machine.isHalted()),
+        errors: correct ? [] : diagnoseErrors(task, submitted),
+      }
+      useProgressStore.getState().recordAttempt(attempt)
 
       if (task.format === 'prediction' && machine.getStepCount() === 0) {
         performLogicalStep()
@@ -229,7 +261,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
 
       set({
         result: {
-          correct: checkAnswer(task.answer, submitted),
+          correct,
           submitted,
           hintsUsed: openedHints,
         },
@@ -245,6 +277,8 @@ export const useSessionStore = create<SessionState>((set, get) => {
         draft: createDraft(task),
         result: null,
         openedHints: 0,
+        attemptStartedAtMs: Date.now(),
+        executedSteps: 0,
       }))
     },
 
@@ -329,4 +363,32 @@ function draftToAnswer(draft: AnswerDraft): TaskAnswer | null {
     direction: draft.direction,
     nextState: draft.nextState,
   }
+}
+
+function getSimulationUsage(stepsExecuted: number, halted: boolean): SimulationUsage {
+  if (stepsExecuted === 0) return 'none'
+  return halted ? 'full' : 'partial'
+}
+
+function diagnoseErrors(task: Task, submitted: TaskAnswer): string[] {
+  if (task.answer.type !== 'prediction' || submitted.type !== 'prediction') return []
+
+  const availableCodes = new Set(task.commonMistakes.map((mistake) => mistake.type))
+  const errors = new Set<string>()
+  const addAvailable = (...codes: string[]) => {
+    const code = codes.find((candidate) => availableCodes.has(candidate))
+    if (code !== undefined) errors.add(code)
+  }
+
+  if (task.answer.write !== submitted.write) {
+    addAvailable('wrong-write-symbol', 'wrong-command')
+  }
+  if (task.answer.direction !== submitted.direction) {
+    addAvailable('wrong-direction', 'wrong-command')
+  }
+  if (task.answer.nextState !== submitted.nextState) {
+    addAvailable('wrong-next-state', 'wrong-command')
+  }
+
+  return [...errors]
 }

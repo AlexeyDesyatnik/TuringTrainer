@@ -8,7 +8,7 @@ const rawTasks = [
     id: 'l1-command-reading-01',
     level: 1,
     format: 'command-reading',
-    skills: ['command-reading'],
+    skills: ['command-reading', 'machine-mechanics'],
     title: 'Прочитай команду',
     description:
       'Головка находится над символом 0, машина — в состоянии q0. Какую команду она выполнит?',
@@ -54,7 +54,7 @@ const rawTasks = [
     id: 'l1-prediction-01',
     level: 1,
     format: 'prediction',
-    skills: ['single-step'],
+    skills: ['single-step', 'machine-mechanics'],
     title: 'Предскажи следующий шаг',
     description:
       'До запуска машины предскажи три части следующего шага: записываемый символ, направление движения и новое состояние.',

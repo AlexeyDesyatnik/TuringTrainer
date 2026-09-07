@@ -7,6 +7,7 @@ import {
   DEFAULT_AUTO_SPEED,
   useSessionStore,
 } from './sessionStore'
+import { useProgressStore } from './progressStore'
 
 describe('автозапуск сессии', () => {
   beforeEach(() => {
@@ -242,5 +243,58 @@ describe('подсказки текущей попытки', () => {
     useSessionStore.getState().selectTask('l1-prediction-01')
 
     expect(useSessionStore.getState().openedHints).toBe(0)
+  })
+})
+
+describe('фиксация статистики попытки', () => {
+  beforeEach(() => {
+    useProgressStore.getState().clearProgress()
+    const store = useSessionStore.getState()
+    store.selectTask('l1-command-reading-01')
+    store.retry()
+    store.setReducedMotion(true)
+  })
+
+  it('учитывает выполненные учеником шаги и использование симулятора', () => {
+    const store = useSessionStore.getState()
+    store.step()
+    store.setChoice('write-1-right-q1')
+    store.submitAnswer()
+
+    expect(useProgressStore.getState().attempts).toHaveLength(1)
+    expect(useProgressStore.getState().attempts[0]).toMatchObject({
+      taskId: 'l1-command-reading-01',
+      mode: 'learning',
+      correct: true,
+      hintsUsed: 0,
+      stepsExecuted: 1,
+      simulationUsage: 'partial',
+      errors: [],
+    })
+  })
+
+  it('не считает демонстрационный шаг после прогноза использованием симулятора', () => {
+    const store = useSessionStore.getState()
+    store.selectTask('l1-prediction-01')
+    store.updatePrediction({ write: '0', direction: 'R', nextState: 'scan' })
+    store.submitAnswer()
+
+    expect(useSessionStore.getState().machine.getStepCount()).toBe(1)
+    expect(useProgressStore.getState().attempts[0]).toMatchObject({
+      taskId: 'l1-prediction-01',
+      correct: false,
+      stepsExecuted: 0,
+      simulationUsage: 'none',
+      errors: ['wrong-command', 'wrong-direction'],
+    })
+  })
+
+  it('не создаёт повторную запись при повторной отправке результата', () => {
+    const store = useSessionStore.getState()
+    store.setChoice('write-1-right-q1')
+    store.submitAnswer()
+    store.submitAnswer()
+
+    expect(useProgressStore.getState().attempts).toHaveLength(1)
   })
 })

@@ -3,9 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { App } from './App'
 import { ANIMATION_PHASE_MS, useSessionStore } from './store/sessionStore'
+import { useProgressStore } from './store/progressStore'
 
 describe('экран учебной задачи', () => {
   beforeEach(() => {
+    useProgressStore.getState().clearProgress()
     useSessionStore.getState().selectTask('l1-command-reading-01')
     useSessionStore.getState().retry()
     useSessionStore.getState().setReducedMotion(true)
@@ -61,6 +63,8 @@ describe('экран учебной задачи', () => {
     expect(result).toHaveTextContent('Твой ответ: Записать 1, сдвинуться влево, перейти в q1')
     expect(result).toHaveTextContent('Правильный ответ: Записать 1, сдвинуться вправо, перейти в q1')
     expect(result).toHaveTextContent('Активную команду задаёт пара q0 и 0')
+    expect(result).toHaveTextContent('Попытка сохранена на этом устройстве')
+    expect(screen.getByLabelText('Сохранённый прогресс')).toHaveTextContent('Попыток: 1')
 
     fireEvent.click(within(result).getByRole('button', { name: 'Решить ещё раз' }))
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
