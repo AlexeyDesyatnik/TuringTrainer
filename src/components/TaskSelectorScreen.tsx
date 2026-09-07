@@ -117,6 +117,9 @@ export function skillLabel(skill: string): string {
     'algorithm-function': 'Функция алгоритма',
     'one-way-pass': 'Однонаправленный проход',
     'reverse-reasoning': 'Обратное рассуждение',
+    'pattern-recognition': 'Поиск закономерности',
+    'alternating-states': 'Чередование состояний',
+    'analytical-solution': 'Аналитическое решение',
   }
   return labels[skill] ?? skill
 }

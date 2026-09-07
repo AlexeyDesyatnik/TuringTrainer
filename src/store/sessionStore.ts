@@ -1,7 +1,8 @@
 import { create } from 'zustand'
 
 import { checkAnswer } from '../core/checkAnswer'
-import { TuringMachine } from '../core/TuringMachine'
+import { EMPTY_SYMBOL, TuringMachine } from '../core/TuringMachine'
+import { parseTapeInput } from '../core/parseTapeInput'
 import { tasks } from '../data/tasks'
 import type { Direction, StepResult } from '../types/machine'
 import type { AttemptMode, AttemptStats, SimulationUsage } from '../types/progress'
@@ -13,6 +14,7 @@ export type AnswerDraft =
   | { type: 'prediction'; write: string; direction: Direction | ''; nextState: string }
   | { type: 'steps'; value: string }
   | { type: 'count'; symbol: string; value: string }
+  | { type: 'tape'; startIndex: string; value: string }
   | null
 
 export type AnimationPhase = 'write' | 'move' | 'state' | null
@@ -56,6 +58,7 @@ interface SessionState {
   reset: () => void
   setChoice: (value: string) => void
   setNumericAnswer: (value: string) => void
+  updateTapeAnswer: (values: Partial<Omit<Extract<AnswerDraft, { type: 'tape' }>, 'type'>>) => void
   updatePrediction: (values: Partial<Omit<Extract<AnswerDraft, { type: 'prediction' }>, 'type'>>) => void
   submitAnswer: () => void
   retry: () => void
@@ -274,6 +277,12 @@ export const useSessionStore = create<SessionState>((set, get) => {
       set({ draft: { ...draft, value }, result: null })
     },
 
+    updateTapeAnswer: (values) => {
+      const { draft, result } = get()
+      if (result !== null || draft?.type !== 'tape') return
+      set({ draft: { ...draft, ...values }, result: null })
+    },
+
     updatePrediction: (values) => {
       const { draft, result } = get()
       if (result !== null || draft?.type !== 'prediction') return
@@ -293,12 +302,16 @@ export const useSessionStore = create<SessionState>((set, get) => {
         mode,
       } = get()
       if (animationPhase !== null || result !== null) return
-      const submitted = draftToAnswer(draft)
+      const submitted = draftToAnswer(draft, task)
       if (submitted === null) return
       stopAuto()
 
       const correct = checkAnswer(task.answer, submitted)
-      const errors = correct ? [] : diagnoseErrors(task, submitted)
+      const simulationUsage = getSimulationUsage(executedSteps, machine.isHalted())
+      const errors = [
+        ...(correct ? [] : diagnoseErrors(task, submitted)),
+        ...diagnoseStrategy(task, simulationUsage),
+      ]
       const durationMs = Math.max(0, Date.now() - attemptStartedAtMs)
       stopExamTimer()
       const attempt: AttemptStats = {
@@ -309,7 +322,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         correct,
         hintsUsed: openedHints,
         stepsExecuted: executedSteps,
-        simulationUsage: getSimulationUsage(executedSteps, machine.isHalted()),
+        simulationUsage,
         errors,
       }
       useProgressStore.getState().recordAttempt(attempt)
@@ -468,10 +481,18 @@ function createDraft(task: Task): AnswerDraft {
   if (task.answer.type === 'count') {
     return { type: 'count', symbol: task.answer.symbol, value: '' }
   }
+  if (task.answer.type === 'tape') {
+    const indexes = Object.keys(task.answer.value).map(Number)
+    return {
+      type: 'tape',
+      startIndex: indexes.length === 0 ? '0' : String(Math.min(...indexes)),
+      value: '',
+    }
+  }
   return null
 }
 
-function draftToAnswer(draft: AnswerDraft): TaskAnswer | null {
+function draftToAnswer(draft: AnswerDraft, task: Task): TaskAnswer | null {
   if (draft === null) return null
 
   if (draft.type === 'choice') {
@@ -488,6 +509,11 @@ function draftToAnswer(draft: AnswerDraft): TaskAnswer | null {
     const value = Number(draft.value)
     if (draft.value === '' || !Number.isInteger(value) || value < 0) return null
     return { type: 'count', symbol: draft.symbol, value }
+  }
+
+  if (draft.type === 'tape') {
+    const value = parseTapeInput(draft.startIndex, draft.value, task.alphabet)
+    return value === null ? null : { type: 'tape', value }
   }
 
   if (draft.write === '' || draft.direction === '' || draft.nextState === '') return null
@@ -529,6 +555,17 @@ function diagnoseErrors(task: Task, submitted: TaskAnswer): string[] {
     return [...errors]
   }
 
+  if (task.answer.type === 'tape' && submitted.type === 'tape') {
+    const expectedStart = firstNonEmptyIndex(task.answer.value)
+    const submittedStart = firstNonEmptyIndex(submitted.value)
+    if (expectedStart !== submittedStart) {
+      addAvailable('position-shift', 'wrong-pattern')
+    } else {
+      addAvailable('wrong-pattern')
+    }
+    return [...errors]
+  }
+
   if (task.answer.type !== 'prediction' || submitted.type !== 'prediction') return []
 
   if (task.answer.write !== submitted.write) {
@@ -542,4 +579,21 @@ function diagnoseErrors(task: Task, submitted: TaskAnswer): string[] {
   }
 
   return [...errors]
+}
+
+function diagnoseStrategy(task: Task, simulationUsage: SimulationUsage): string[] {
+  if (
+    simulationUsage === 'full'
+    && task.commonMistakes.some((mistake) => mistake.type === 'full-trace-overuse')
+  ) {
+    return ['full-trace-overuse']
+  }
+  return []
+}
+
+function firstNonEmptyIndex(tape: Record<number, string>): number | null {
+  const indexes = Object.entries(tape)
+    .filter(([, symbol]) => symbol !== EMPTY_SYMBOL)
+    .map(([index]) => Number(index))
+  return indexes.length === 0 ? null : Math.min(...indexes)
 }

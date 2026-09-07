@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 
 import { makeCommandKey } from '../core/commandKey'
+import { parseTapeInput } from '../core/parseTapeInput'
 import { EMPTY_SYMBOL } from '../core/TuringMachine'
 import { tasks } from '../data/tasks'
 import {
@@ -411,11 +412,12 @@ function AnswerPanel({ task, draft, animationActive }: {
   const result = useSessionStore((state) => state.result)
   const setChoice = useSessionStore((state) => state.setChoice)
   const setNumericAnswer = useSessionStore((state) => state.setNumericAnswer)
+  const updateTapeAnswer = useSessionStore((state) => state.updateTapeAnswer)
   const updatePrediction = useSessionStore((state) => state.updatePrediction)
   const submitAnswer = useSessionStore((state) => state.submitAnswer)
   const retry = useSessionStore((state) => state.retry)
   const nextTask = useSessionStore((state) => state.nextTask)
-  const complete = isDraftComplete(draft)
+  const complete = isDraftComplete(draft, task)
 
   return (
     <section aria-labelledby="answer-heading" className="mt-6 rounded-3xl border border-violet-200 bg-white p-5 shadow-sm sm:p-7">
@@ -533,6 +535,40 @@ function AnswerPanel({ task, draft, animationActive }: {
           </label>
         )}
 
+        {draft?.type === 'tape' && (
+          <div className="mt-5 grid max-w-2xl gap-4 sm:grid-cols-[10rem_1fr]">
+            <label className="text-sm font-bold text-slate-700">
+              Начальный индекс
+              <input
+                aria-label="Начальный индекс ответа"
+                className={selectClass}
+                disabled={result !== null || animationActive}
+                inputMode="numeric"
+                onChange={(event) => updateTapeAnswer({ startIndex: event.target.value })}
+                step="1"
+                type="number"
+                value={draft.startIndex}
+              />
+            </label>
+            <label className="text-sm font-bold text-slate-700">
+              Содержимое ленты
+              <input
+                aria-describedby="tape-answer-help"
+                aria-label="Содержимое ленты в ответе"
+                className={`${selectClass} font-mono tracking-widest`}
+                disabled={result !== null || animationActive}
+                onChange={(event) => updateTapeAnswer({ value: event.target.value })}
+                placeholder="Например: 1101"
+                type="text"
+                value={draft.value}
+              />
+            </label>
+            <p className="text-xs leading-5 text-slate-500 sm:col-span-2" id="tape-answer-help">
+              Введи символы подряд или через пробел. Для пустой ячейки используй λ.
+            </p>
+          </div>
+        )}
+
         <button className={`${primaryButton} mt-5`} disabled={!complete || result !== null || animationActive} onClick={submitAnswer} type="button">
           Проверить ответ
         </button>
@@ -567,7 +603,7 @@ function AnswerPanel({ task, draft, animationActive }: {
             <p className="mt-3 text-sm leading-6 text-slate-700">{task.explanation}</p>
             {result.errors.length > 0 && (
               <div className="mt-4 rounded-xl border border-rose-200 bg-white/70 p-4 text-sm leading-6 text-slate-700">
-                <p className="font-bold text-rose-900">Диагностика ошибки</p>
+                <p className="font-bold text-rose-900">Диагностика решения</p>
                 {result.errors.map((error) => (
                   <p className="mt-1" key={error}>{mistakeDescription(task, error)}</p>
                 ))}
@@ -590,7 +626,7 @@ function AnswerPanel({ task, draft, animationActive }: {
   )
 }
 
-function isDraftComplete(draft: AnswerDraft): boolean {
+function isDraftComplete(draft: AnswerDraft, task: Task): boolean {
   if (draft === null) return false
   if (draft.type === 'choice') return draft.value !== ''
   if (draft.type === 'steps') {
@@ -601,6 +637,9 @@ function isDraftComplete(draft: AnswerDraft): boolean {
     const value = Number(draft.value)
     return draft.value !== '' && Number.isInteger(value) && value >= 0
   }
+  if (draft.type === 'tape') {
+    return parseTapeInput(draft.startIndex, draft.value, task.alphabet) !== null
+  }
   return draft.write !== '' && draft.direction !== '' && draft.nextState !== ''
 }
 
@@ -608,6 +647,7 @@ function answerHeading(answer: TaskAnswer): string {
   if (answer.type === 'prediction') return 'Предскажи команду до запуска'
   if (answer.type === 'steps') return 'Укажи число выполненных команд'
   if (answer.type === 'count') return `Подсчитай символы «${displaySymbol(answer.symbol)}»`
+  if (answer.type === 'tape') return 'Запиши итоговое содержимое ленты'
   return 'Выбери команду'
 }
 
@@ -665,9 +705,7 @@ function formatAnswer(task: Task, answer: TaskAnswer): string {
     return `${answer.value} ${symbolsWord(answer.value)} «${displaySymbol(answer.symbol)}»`
   }
   if (answer.type === 'steps') return `${answer.value} ${stepsWord(answer.value)}`
-  return Object.entries(answer.value)
-    .map(([index, symbol]) => `${index}:${displaySymbol(symbol)}`)
-    .join(', ')
+  return formatTapeAnswer(answer.value)
 }
 
 function stepsWord(value: number): string {
@@ -690,4 +728,24 @@ function symbolsWord(value: number): string {
 
 function mistakeDescription(task: Task, error: string): string {
   return task.commonMistakes.find((mistake) => mistake.type === error)?.description ?? error
+}
+
+function formatTapeAnswer(tape: Record<number, string>): string {
+  const entries = Object.entries(tape)
+    .filter(([, symbol]) => symbol !== EMPTY_SYMBOL)
+    .map(([index, symbol]) => [Number(index), symbol] as const)
+    .sort(([left], [right]) => left - right)
+
+  if (entries.length === 0) return 'пустая лента'
+
+  const contiguous = entries.every(
+    ([index], position) => position === 0 || index === entries[position - 1]![0] + 1,
+  )
+  if (!contiguous) {
+    return entries.map(([index, symbol]) => `${index}:${displaySymbol(symbol)}`).join(', ')
+  }
+
+  const first = entries[0]![0]
+  const last = entries[entries.length - 1]![0]
+  return `[${first}…${last}] ${entries.map(([, symbol]) => displaySymbol(symbol)).join('')}`
 }

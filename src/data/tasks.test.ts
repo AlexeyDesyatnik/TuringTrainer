@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { TuringMachine } from '../core/TuringMachine'
+import { checkAnswer } from '../core/checkAnswer'
 import type { Task } from '../types/task'
 import { tasks } from './tasks'
 import { parseTask, parseTasks, TaskValidationError } from './validateTask'
@@ -23,6 +24,10 @@ describe('runtime-валидация задач', () => {
     expect(tasks.filter((task) => task.level === 2).map((task) => task.format)).toEqual([
       'algorithm', 'prediction', 'algorithm', 'reverse',
     ])
+    expect(tasks.filter((task) => task.level === 3).map((task) => task.format)).toEqual([
+      'pattern', 'exam',
+    ])
+    expect(tasks).toHaveLength(10)
   })
 
   it('останавливает все машины набора без достижения защитного лимита', () => {
@@ -258,5 +263,51 @@ describe('эталонные шаги учебных задач', () => {
       newState: 'qB',
     })
     expect(task.answer).toEqual({ type: 'choice', value: 'qA' })
+  })
+
+  it('подтверждает инверсию длинной ленты и перенос правила', () => {
+    const task = getTask('l3-pattern-01')
+    const machine = new TuringMachine(task.machine)
+
+    while (!machine.isHalted()) machine.step()
+
+    const actualTape = Object.fromEntries(
+      machine.getTapeView(7, 8)
+        .filter((cell) => cell.symbol !== 'λ')
+        .map((cell) => [cell.index, cell.symbol]),
+    )
+    expect(task.answer.type).toBe('tape')
+    if (task.answer.type !== 'tape') throw new Error('Ожидался ответ-лента')
+    expect(checkAnswer(task.answer, { type: 'tape', value: actualTape })).toBe(true)
+    expect(machine.getStepCount()).toBe(17)
+
+    const shortMachine = new TuringMachine({
+      ...task.machine,
+      initialTape: { 0: '0', 1: '1', 2: '0' },
+    })
+    while (!shortMachine.isHalted()) shortMachine.step()
+    expect(shortMachine.getTapeView(1, 1)).toEqual([
+      { index: 0, symbol: '1' },
+      { index: 1, symbol: '0' },
+      { index: 2, symbol: '1' },
+    ])
+  })
+
+  it('подтверждает аналитический подсчёт пар и нечётного остатка', () => {
+    const task = getTask('l3-exam-01')
+    const machine = new TuringMachine(task.machine)
+
+    while (!machine.isHalted()) machine.step()
+
+    expect(machine.getStepCount()).toBe(22)
+    expect(machine.countSymbol('1')).toBe(10)
+    expect(task.answer).toEqual({ type: 'count', symbol: '1', value: 10 })
+
+    const shortMachine = new TuringMachine({
+      ...task.machine,
+      initialTape: { 0: '1', 1: '1', 2: '1', 3: '1', 4: '1' },
+    })
+    while (!shortMachine.isHalted()) shortMachine.step()
+    expect(shortMachine.countSymbol('1')).toBe(2)
   })
 })

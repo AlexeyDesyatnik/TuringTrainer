@@ -3,6 +3,10 @@ import { EMPTY_SYMBOL } from '../core/TuringMachine'
 import type { Task } from '../types/task'
 import { parseTasks } from './validateTask'
 
+function tapeFromString(value: string): Record<number, string> {
+  return Object.fromEntries(Array.from(value, (symbol, index) => [index, symbol]))
+}
+
 const rawTasks = [
   {
     id: 'l1-command-reading-01',
@@ -359,6 +363,96 @@ const rawTasks = [
       { type: 'reverse-reasoning-missed', description: 'Таблица прочитана только вперёд, без поиска команды по результату.' },
     ],
     source: { kind: 'original', label: 'Авторская задача тренажёра' },
+  },
+  {
+    id: 'l3-pattern-01',
+    level: 3,
+    format: 'pattern',
+    skills: ['pattern-recognition', 'one-way-pass'],
+    title: 'Инверсия длинной ленты',
+    description:
+      'С индекса 0 записан фрагмент 0010110011010010. Машина идёт только вправо и меняет каждый двоичный символ на противоположный. Запиши итоговый непустой фрагмент ленты, не выполняя полную трассировку.',
+    machine: {
+      initialTape: tapeFromString('0010110011010010'),
+      headPosition: 0,
+      initialState: 'invert',
+      commands: {
+        [makeCommandKey('invert', '0')]: { write: '1', direction: 'R', nextState: 'invert' },
+        [makeCommandKey('invert', '1')]: { write: '0', direction: 'R', nextState: 'invert' },
+        [makeCommandKey('invert', EMPTY_SYMBOL)]: {
+          write: EMPTY_SYMBOL,
+          direction: 'S',
+          nextState: 'halt',
+        },
+      },
+      stepLimit: 25,
+    },
+    alphabet: [EMPTY_SYMBOL, '0', '1'],
+    states: ['invert', 'halt'],
+    answer: { type: 'tape', value: tapeFromString('1101001100101101') },
+    hints: [
+      'Сформулируй преобразование одной ячейки независимо от остальных.',
+      'Головка не возвращается назад: каждый символ обрабатывается ровно один раз.',
+      'Замени одновременно все 0 на 1, а все 1 на 0, сохраняя порядок и длину строки.',
+    ],
+    explanation:
+      'Состояние invert реализует независимую замену 0 → 1 и 1 → 0, после которой головка всегда движется вправо. Поэтому длина и позиции символов не меняются, а весь результат получается одновременной инверсией исходной строки: 1101001100101101. Команда на λ только останавливает машину.',
+    commonMistakes: [
+      { type: 'wrong-pattern', description: 'Закономерность инверсии применена не ко всем символам.' },
+      { type: 'position-shift', description: 'Символы ошибочно сдвинуты или изменён начальный индекс.' },
+      { type: 'full-trace-overuse', description: 'Одно и то же локальное правило вычислялось пошагово для всей длинной ленты.' },
+    ],
+    source: { kind: 'original', label: 'Авторская задача тренажёра' },
+  },
+  {
+    id: 'l3-exam-01',
+    level: 3,
+    format: 'exam',
+    skills: ['alternating-states', 'analytical-solution'],
+    title: 'Каждая вторая единица',
+    description:
+      'На ленте записана 21 единица подряд. Состояния erase и keep чередуются при движении вправо. Сколько единиц останется после остановки машины? Реши задачу аналитически.',
+    machine: {
+      initialTape: tapeFromString('1'.repeat(21)),
+      headPosition: 0,
+      initialState: 'erase',
+      commands: {
+        [makeCommandKey('erase', '1')]: {
+          write: EMPTY_SYMBOL,
+          direction: 'R',
+          nextState: 'keep',
+        },
+        [makeCommandKey('keep', '1')]: { write: '1', direction: 'R', nextState: 'erase' },
+        [makeCommandKey('erase', EMPTY_SYMBOL)]: {
+          write: EMPTY_SYMBOL,
+          direction: 'S',
+          nextState: 'halt',
+        },
+        [makeCommandKey('keep', EMPTY_SYMBOL)]: {
+          write: EMPTY_SYMBOL,
+          direction: 'S',
+          nextState: 'halt',
+        },
+      },
+      stepLimit: 30,
+    },
+    alphabet: [EMPTY_SYMBOL, '1'],
+    states: ['erase', 'keep', 'halt'],
+    answer: { type: 'count', symbol: '1', value: 10 },
+    hints: [
+      'Рассмотри пару соседних единиц и проследи только смену состояний.',
+      'В каждой полной паре состояние erase стирает первую единицу, а keep сохраняет вторую.',
+      'Из 21 единицы образуются 10 полных пар и одна лишняя единица, которая попадает в состояние erase.',
+    ],
+    explanation:
+      'Каждые две команды образуют повторяющийся блок: первая единица пары стирается в erase, вторая сохраняется в keep. В 21 символе есть 10 полных пар и одна оставшаяся единица. Каждая пара даёт одну сохранённую единицу, а последняя нечётная единица стирается. Ответ: 10.',
+    commonMistakes: [
+      { type: 'cycle-missed', description: 'Не распознан двухшаговый цикл erase → keep.' },
+      { type: 'odd-remainder-missed', description: 'Неверно обработана последняя единица при нечётной длине блока.' },
+      { type: 'full-trace-overuse', description: 'Вместо подсчёта пар выполнена полная трассировка 21 символа.' },
+      { type: 'wrong-count', description: 'Неверно подсчитано число полных пар.' },
+    ],
+    source: { kind: 'original', label: 'Авторская задача экзаменационного формата' },
   },
 ] satisfies Task[]
 

@@ -233,4 +233,26 @@ describe('экран учебной задачи', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('2 символа «1»')
     expect(useSessionStore.getState().machine.getStepCount()).toBe(0)
   })
+
+  it('принимает итоговый фрагмент ленты с абсолютным начальным индексом', () => {
+    useSessionStore.getState().selectTask('l3-pattern-01')
+    useSessionStore.getState().retry()
+    render(<App />)
+
+    const submit = screen.getByRole('button', { name: 'Проверить ответ' })
+    expect(screen.getByLabelText('Начальный индекс ответа')).toHaveValue(0)
+    fireEvent.change(screen.getByLabelText('Содержимое ленты в ответе'), {
+      target: { value: '1101001100101102' },
+    })
+    expect(submit).toBeDisabled()
+
+    fireEvent.change(screen.getByLabelText('Содержимое ленты в ответе'), {
+      target: { value: '1101 0011 0010 1101' },
+    })
+    expect(submit).toBeEnabled()
+    fireEvent.click(submit)
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Верно')
+    expect(screen.getByRole('alert')).toHaveTextContent('[0…15] 1101001100101101')
+  })
 })

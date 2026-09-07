@@ -343,6 +343,30 @@ describe('поведение задач уровня 2', () => {
   })
 })
 
+describe('стратегия решения задач уровня 3', () => {
+  beforeEach(() => {
+    useProgressStore.getState().clearProgress()
+    const store = useSessionStore.getState()
+    store.setMode('learning')
+    store.selectTask('l3-exam-01')
+    store.retry()
+    store.setReducedMotion(true)
+  })
+
+  it('фиксирует избыточную полную трассировку отдельно от правильности', () => {
+    const store = useSessionStore.getState()
+    while (!useSessionStore.getState().machine.isHalted()) store.step()
+    store.setNumericAnswer('10')
+    store.submitAnswer()
+
+    expect(useProgressStore.getState().attempts[0]).toMatchObject({
+      correct: true,
+      simulationUsage: 'full',
+      errors: ['full-trace-overuse'],
+    })
+  })
+})
+
 describe('экзаменационный режим', () => {
   beforeEach(() => {
     vi.useFakeTimers()

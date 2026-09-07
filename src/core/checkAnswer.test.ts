@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { TaskAnswer } from '../types/task'
 import { checkAnswer } from './checkAnswer'
+import { parseTapeInput } from './parseTapeInput'
 import { EMPTY_SYMBOL } from './TuringMachine'
 
 describe('checkAnswer', () => {
@@ -45,5 +46,17 @@ describe('checkAnswer', () => {
       { type: 'steps', value: 1 },
       { type: 'choice', value: '1' },
     )).toBe(false)
+  })
+
+  it('преобразует строковый ввод ленты в абсолютные индексы', () => {
+    expect(parseTapeInput('-1', 'λ 1 0 λ', [EMPTY_SYMBOL, '0', '1'])).toEqual({
+      [-1]: EMPTY_SYMBOL,
+      0: '1',
+      1: '0',
+      2: EMPTY_SYMBOL,
+    })
+    expect(parseTapeInput('0.5', '10', [EMPTY_SYMBOL, '0', '1'])).toBeNull()
+    expect(parseTapeInput('0', '12', [EMPTY_SYMBOL, '0', '1'])).toBeNull()
+    expect(parseTapeInput('0', '   ', [EMPTY_SYMBOL, '0', '1'])).toBeNull()
   })
 })
