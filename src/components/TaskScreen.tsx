@@ -8,8 +8,9 @@ import {
   AUTO_SPEED_MIN,
   useSessionStore,
   type AnswerDraft,
+  type AnimationPhase,
 } from '../store/sessionStore'
-import type { Direction, HaltReason } from '../types/machine'
+import type { Direction, HaltReason, StepResult } from '../types/machine'
 import type { Task, TaskAnswer } from '../types/task'
 
 const primaryButton =
@@ -27,6 +28,8 @@ export function TaskScreen() {
   const result = useSessionStore((state) => state.result)
   const autoRunning = useSessionStore((state) => state.autoRunning)
   const autoSpeedMs = useSessionStore((state) => state.autoSpeedMs)
+  const animationPhase = useSessionStore((state) => state.animationPhase)
+  const animatedStep = useSessionStore((state) => state.animatedStep)
   const selectTask = useSessionStore((state) => state.selectTask)
   const step = useSessionStore((state) => state.step)
   const undo = useSessionStore((state) => state.undo)
@@ -34,15 +37,36 @@ export function TaskScreen() {
   const toggleAuto = useSessionStore((state) => state.toggleAuto)
   const stopAuto = useSessionStore((state) => state.stopAuto)
   const setAutoSpeed = useSessionStore((state) => state.setAutoSpeed)
+  const setReducedMotion = useSessionStore((state) => state.setReducedMotion)
 
   useEffect(() => stopAuto, [stopAuto])
 
-  const headPosition = machine.getHeadPosition()
-  const state = machine.getState()
-  const readSymbol = machine.readSymbol()
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return
+
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const updatePreference = () => setReducedMotion(mediaQuery.matches)
+    updatePreference()
+    mediaQuery.addEventListener('change', updatePreference)
+    return () => mediaQuery.removeEventListener('change', updatePreference)
+  }, [setReducedMotion])
+
+  const machineHeadPosition = machine.getHeadPosition()
+  const machineState = machine.getState()
+  const showingOldCommand = animationPhase === 'write' || animationPhase === 'move'
+  const headPosition = animationPhase === 'write' && animatedStep !== null
+    ? animatedStep.previousHeadPosition
+    : machineHeadPosition
+  const tapeCenter = animatedStep?.previousHeadPosition ?? machineHeadPosition
+  const state = showingOldCommand && animatedStep !== null
+    ? animatedStep.previousState
+    : machineState
+  const readSymbol = showingOldCommand && animatedStep !== null
+    ? animatedStep.read
+    : machine.readSymbol()
   const stepCount = machine.getStepCount()
   const predictionPending = task.format === 'prediction' && stepCount === 0 && result === null
-  const tape = machine.getTapeView(headPosition, 7)
+  const tape = machine.getTapeView(tapeCenter, 7)
 
   return (
     <main className="min-h-screen pb-16">
@@ -97,7 +121,7 @@ export function TaskScreen() {
             <div
               aria-label="Состояние машины"
               aria-live="polite"
-              className="flex flex-wrap gap-x-5 gap-y-1 rounded-xl bg-white px-4 py-3 font-mono text-sm shadow-sm ring-1 ring-slate-200"
+              className={`flex flex-wrap gap-x-5 gap-y-1 rounded-xl bg-white px-4 py-3 font-mono text-sm shadow-sm ring-1 ${animationPhase === 'state' ? 'ring-violet-500' : 'ring-slate-200'}`}
               data-revision={revision}
             >
               <span>Состояние <strong className="text-violet-700">{state}</strong></span>
@@ -105,6 +129,17 @@ export function TaskScreen() {
               <span>Шагов <strong>{stepCount}</strong></span>
             </div>
           </div>
+
+          {animationPhase !== null && animatedStep !== null && (
+            <div
+              aria-live="polite"
+              className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-950"
+              data-testid="animation-phase"
+            >
+              <strong>{animationPhaseLabel(animationPhase)}</strong>
+              <span>{animationDescription(animationPhase, animatedStep)}</span>
+            </div>
+          )}
 
           <div className="overflow-x-auto rounded-2xl border border-slate-300 bg-white px-4 pb-4 pt-10 shadow-sm">
             <div className="mx-auto flex w-max gap-1" data-testid="tape">
@@ -119,8 +154,10 @@ export function TaskScreen() {
                     )}
                     <div
                       aria-label={`Ячейка ${cell.index}: ${displaySymbol(cell.symbol)}${active ? ', головка' : ''}`}
-                      className={`flex h-12 w-12 items-center justify-center border-2 font-mono text-lg font-bold ${
-                        active
+                      className={`flex h-12 w-12 items-center justify-center border-2 font-mono text-lg font-bold transition-colors ${
+                        animationPhase === 'write' && cell.index === animatedStep?.previousHeadPosition
+                          ? 'border-emerald-500 bg-emerald-100 text-emerald-950 shadow-[0_0_0_3px_rgba(34,197,94,0.2)]'
+                          : active
                           ? 'border-amber-400 bg-amber-100 text-slate-950 shadow-[0_0_0_3px_rgba(251,191,36,0.25)]'
                           : 'border-slate-200 bg-slate-50 text-slate-700'
                       }`}
@@ -145,12 +182,12 @@ export function TaskScreen() {
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Управление</p>
               <h3 id="controls-heading" className="mt-1 text-lg font-black">Выполнение</h3>
               <div className="mt-5 grid grid-cols-2 gap-2">
-                <button className={secondaryButton} disabled={stepCount === 0 || result !== null || autoRunning} onClick={undo} type="button">
+                <button className={secondaryButton} disabled={stepCount === 0 || result !== null || autoRunning || animationPhase !== null} onClick={undo} type="button">
                   Шаг назад
                 </button>
                 <button
                   className={primaryButton}
-                  disabled={machine.isHalted() || predictionPending || result !== null || autoRunning}
+                  disabled={machine.isHalted() || predictionPending || result !== null || autoRunning || animationPhase !== null}
                   onClick={step}
                   type="button"
                 >
@@ -158,7 +195,7 @@ export function TaskScreen() {
                 </button>
                 <button
                   className={`${autoRunning ? primaryButton : secondaryButton} col-span-2`}
-                  disabled={!autoRunning && (machine.isHalted() || predictionPending || result !== null)}
+                  disabled={!autoRunning && (machine.isHalted() || predictionPending || result !== null || animationPhase !== null)}
                   onClick={toggleAuto}
                   type="button"
                 >
@@ -195,7 +232,7 @@ export function TaskScreen() {
           </aside>
         </div>
 
-        <AnswerPanel task={task} draft={draft} />
+        <AnswerPanel task={task} draft={draft} animationActive={animationPhase !== null} />
       </div>
     </main>
   )
@@ -259,7 +296,11 @@ function CommandTable({ task, currentState, readSymbol }: {
   )
 }
 
-function AnswerPanel({ task, draft }: { task: Task; draft: AnswerDraft }) {
+function AnswerPanel({ task, draft, animationActive }: {
+  task: Task
+  draft: AnswerDraft
+  animationActive: boolean
+}) {
   const result = useSessionStore((state) => state.result)
   const setChoice = useSessionStore((state) => state.setChoice)
   const updatePrediction = useSessionStore((state) => state.updatePrediction)
@@ -291,7 +332,7 @@ function AnswerPanel({ task, draft }: { task: Task; draft: AnswerDraft }) {
                 <input
                   checked={draft.value === choice.value}
                   className="mt-1 h-4 w-4 accent-violet-700"
-                  disabled={result !== null}
+                  disabled={result !== null || animationActive}
                   name="task-answer"
                   onChange={() => setChoice(choice.value)}
                   type="radio"
@@ -310,7 +351,7 @@ function AnswerPanel({ task, draft }: { task: Task; draft: AnswerDraft }) {
               <select
                 aria-label="Записать символ"
                 className={selectClass}
-                disabled={result !== null}
+                disabled={result !== null || animationActive}
                 onChange={(event) => updatePrediction({ write: event.target.value })}
                 value={draft.write}
               >
@@ -323,7 +364,7 @@ function AnswerPanel({ task, draft }: { task: Task; draft: AnswerDraft }) {
               <select
                 aria-label="Направление движения"
                 className={selectClass}
-                disabled={result !== null}
+                disabled={result !== null || animationActive}
                 onChange={(event) => updatePrediction({ direction: event.target.value as Direction | '' })}
                 value={draft.direction}
               >
@@ -339,7 +380,7 @@ function AnswerPanel({ task, draft }: { task: Task; draft: AnswerDraft }) {
               <select
                 aria-label="Новое состояние"
                 className={selectClass}
-                disabled={result !== null}
+                disabled={result !== null || animationActive}
                 onChange={(event) => updatePrediction({ nextState: event.target.value })}
                 value={draft.nextState}
               >
@@ -350,7 +391,7 @@ function AnswerPanel({ task, draft }: { task: Task; draft: AnswerDraft }) {
           </div>
         )}
 
-        <button className={`${primaryButton} mt-5`} disabled={!complete || result !== null} onClick={submitAnswer} type="button">
+        <button className={`${primaryButton} mt-5`} disabled={!complete || result !== null || animationActive} onClick={submitAnswer} type="button">
           Проверить ответ
         </button>
 
@@ -387,6 +428,31 @@ function isDraftComplete(draft: AnswerDraft): boolean {
 
 function displaySymbol(symbol: string): string {
   return symbol === EMPTY_SYMBOL ? '␣' : symbol
+}
+
+function animationPhaseLabel(phase: Exclude<AnimationPhase, null>): string {
+  if (phase === 'write') return '1. Запись'
+  if (phase === 'move') return '2. Движение'
+  return '3. Состояние'
+}
+
+function animationDescription(
+  phase: Exclude<AnimationPhase, null>,
+  step: StepResult,
+): string {
+  if (phase === 'write') {
+    return `В ячейку ${step.previousHeadPosition} записан символ ${displaySymbol(step.written)}.`
+  }
+  if (phase === 'move') {
+    const directions: Record<Direction, string> = {
+      L: 'L, головка движется влево',
+      R: 'R, головка движется вправо',
+      N: 'N, головка остаётся на месте',
+      S: 'S, головка остаётся на месте и машина останавливается',
+    }
+    return directions[step.direction]
+  }
+  return `Новое состояние: ${step.newState}.`
 }
 
 function haltReasonLabel(reason: HaltReason | null): string {

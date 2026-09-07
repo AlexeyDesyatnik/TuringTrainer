@@ -1,13 +1,14 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { App } from './App'
-import { useSessionStore } from './store/sessionStore'
+import { ANIMATION_PHASE_MS, useSessionStore } from './store/sessionStore'
 
 describe('экран учебной задачи', () => {
   beforeEach(() => {
     useSessionStore.getState().selectTask('l1-command-reading-01')
     useSessionStore.getState().reset()
+    useSessionStore.getState().setReducedMotion(true)
   })
 
   afterEach(() => {
@@ -98,5 +99,30 @@ describe('экран учебной задачи', () => {
 
     expect(useSessionStore.getState().autoRunning).toBe(false)
     expect(useSessionStore.getState().machine.getStepCount()).toBe(1)
+  })
+
+  it('показывает три фазы атомарно выполненного шага', () => {
+    vi.useFakeTimers()
+    useSessionStore.getState().setReducedMotion(false)
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Шаг вперёд' }))
+
+    expect(useSessionStore.getState().machine.getState()).toBe('q1')
+    expect(screen.getByTestId('animation-phase')).toHaveTextContent('1. Запись')
+    expect(screen.getByLabelText('Состояние машины')).toHaveTextContent('Состояние q0')
+    expect(screen.getByLabelText('Ячейка 0: 1, головка')).toBeInTheDocument()
+
+    act(() => vi.advanceTimersByTime(ANIMATION_PHASE_MS))
+    expect(screen.getByTestId('animation-phase')).toHaveTextContent('2. Движение')
+    expect(screen.getByLabelText('Ячейка 1: 1, головка')).toBeInTheDocument()
+    expect(screen.getByLabelText('Состояние машины')).toHaveTextContent('Состояние q0')
+
+    act(() => vi.advanceTimersByTime(ANIMATION_PHASE_MS))
+    expect(screen.getByTestId('animation-phase')).toHaveTextContent('3. Состояние')
+    expect(screen.getByLabelText('Состояние машины')).toHaveTextContent('Состояние q1')
+
+    act(() => vi.advanceTimersByTime(ANIMATION_PHASE_MS))
+    expect(screen.queryByTestId('animation-phase')).not.toBeInTheDocument()
   })
 })

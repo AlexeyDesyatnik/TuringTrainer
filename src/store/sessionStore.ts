@@ -3,13 +3,15 @@ import { create } from 'zustand'
 import { checkAnswer } from '../core/checkAnswer'
 import { TuringMachine } from '../core/TuringMachine'
 import { tasks } from '../data/tasks'
-import type { Direction } from '../types/machine'
+import type { Direction, StepResult } from '../types/machine'
 import type { Task, TaskAnswer } from '../types/task'
 
 export type AnswerDraft =
   | { type: 'choice'; value: string }
   | { type: 'prediction'; write: string; direction: Direction | ''; nextState: string }
   | null
+
+export type AnimationPhase = 'write' | 'move' | 'state' | null
 
 export interface AnswerResult {
   correct: boolean
@@ -19,6 +21,7 @@ export interface AnswerResult {
 export const AUTO_SPEED_MIN = 100
 export const AUTO_SPEED_MAX = 1000
 export const DEFAULT_AUTO_SPEED = 500
+export const ANIMATION_PHASE_MS = 220
 
 interface SessionState {
   task: Task
@@ -28,6 +31,9 @@ interface SessionState {
   result: AnswerResult | null
   autoRunning: boolean
   autoSpeedMs: number
+  animationPhase: AnimationPhase
+  animatedStep: StepResult | null
+  reducedMotion: boolean
   selectTask: (taskId: string) => void
   step: () => void
   undo: () => void
@@ -40,6 +46,7 @@ interface SessionState {
   toggleAuto: () => void
   stopAuto: () => void
   setAutoSpeed: (speedMs: number) => void
+  setReducedMotion: (reduced: boolean) => void
 }
 
 const initialTask = tasks[0]
@@ -49,45 +56,96 @@ if (initialTask === undefined) {
 }
 
 export const useSessionStore = create<SessionState>((set, get) => {
-  let autoTimer: ReturnType<typeof setTimeout> | null = null
+  let executionTimer: ReturnType<typeof setTimeout> | null = null
 
-  function clearAutoTimer(): void {
-    if (autoTimer === null) return
-    clearTimeout(autoTimer)
-    autoTimer = null
+  function clearExecutionTimer(): void {
+    if (executionTimer === null) return
+    clearTimeout(executionTimer)
+    executionTimer = null
+  }
+
+  function schedule(callback: () => void, delayMs: number): void {
+    clearExecutionTimer()
+    executionTimer = setTimeout(callback, delayMs)
   }
 
   function stopAuto(): void {
-    clearAutoTimer()
-    if (get().autoRunning) set({ autoRunning: false })
+    clearExecutionTimer()
+    const { animatedStep, animationPhase, autoRunning } = get()
+    if (!autoRunning && animationPhase === null && animatedStep === null) return
+    set({ autoRunning: false, animationPhase: null, animatedStep: null })
   }
 
-  function scheduleAutomaticStep(): void {
-    clearAutoTimer()
-    autoTimer = setTimeout(runAutomaticStep, get().autoSpeedMs)
+  function finishVisualStep(): void {
+    clearExecutionTimer()
+    const { autoRunning, machine } = get()
+    const shouldContinue = autoRunning && !machine.isHalted()
+
+    set({
+      animationPhase: null,
+      animatedStep: null,
+      autoRunning: shouldContinue,
+    })
+
+    if (shouldContinue) schedule(runAutomaticStep, get().autoSpeedMs)
+  }
+
+  function advanceAnimation(): void {
+    const { animationPhase } = get()
+
+    if (animationPhase === 'write') {
+      set({ animationPhase: 'move' })
+      schedule(advanceAnimation, ANIMATION_PHASE_MS)
+    } else if (animationPhase === 'move') {
+      set({ animationPhase: 'state' })
+      schedule(advanceAnimation, ANIMATION_PHASE_MS)
+    } else if (animationPhase === 'state') {
+      finishVisualStep()
+    }
+  }
+
+  function performLogicalStep(): void {
+    clearExecutionTimer()
+    const { machine, reducedMotion, task } = get()
+    const stepResult = machine.step()
+
+    if (stepResult === null) {
+      set((state) => ({
+        revision: state.revision + 1,
+        autoRunning: false,
+        animationPhase: null,
+        animatedStep: null,
+      }))
+      return
+    }
+
+    const shouldAnimate = task.level === 1 && !reducedMotion
+
+    set((state) => ({
+      revision: state.revision + 1,
+      animationPhase: shouldAnimate ? 'write' : null,
+      animatedStep: shouldAnimate ? stepResult : null,
+      autoRunning: shouldAnimate
+        ? state.autoRunning
+        : state.autoRunning && !machine.isHalted(),
+    }))
+
+    if (shouldAnimate) {
+      schedule(advanceAnimation, ANIMATION_PHASE_MS)
+    } else if (get().autoRunning) {
+      schedule(runAutomaticStep, get().autoSpeedMs)
+    }
   }
 
   function runAutomaticStep(): void {
-    const { autoRunning, machine, result } = get()
+    const { animationPhase, autoRunning, machine, result } = get()
 
-    if (!autoRunning || result !== null || machine.isHalted()) {
+    if (!autoRunning || animationPhase !== null || result !== null || machine.isHalted()) {
       stopAuto()
       return
     }
 
-    const stepResult = machine.step()
-    const stopped = stepResult === null || machine.isHalted()
-
-    set((state) => ({
-      revision: state.revision + 1,
-      autoRunning: !stopped,
-    }))
-
-    if (stopped) {
-      clearAutoTimer()
-    } else {
-      scheduleAutomaticStep()
-    }
+    performLogicalStep()
   }
 
   return {
@@ -98,6 +156,9 @@ export const useSessionStore = create<SessionState>((set, get) => {
     result: null,
     autoRunning: false,
     autoSpeedMs: DEFAULT_AUTO_SPEED,
+    animationPhase: null,
+    animatedStep: null,
+    reducedMotion: false,
 
     selectTask: (taskId) => {
       const task = tasks.find((candidate) => candidate.id === taskId)
@@ -114,12 +175,10 @@ export const useSessionStore = create<SessionState>((set, get) => {
     },
 
     step: () => {
-      const { autoRunning, machine, result, task } = get()
-      if (autoRunning || result !== null) return
+      const { animationPhase, autoRunning, machine, result, task } = get()
+      if (autoRunning || animationPhase !== null || result !== null) return
       if (task.format === 'prediction' && machine.getStepCount() === 0) return
-
-      machine.step()
-      set((state) => ({ revision: state.revision + 1, result: null }))
+      performLogicalStep()
     },
 
     undo: () => {
@@ -127,7 +186,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       if (result !== null) return
       stopAuto()
       if (!machine.undo()) return
-      set((state) => ({ revision: state.revision + 1, result: null }))
+      set((state) => ({ revision: state.revision + 1 }))
     },
 
     reset: () => {
@@ -153,20 +212,17 @@ export const useSessionStore = create<SessionState>((set, get) => {
     },
 
     submitAnswer: () => {
-      const { draft, machine, result, task } = get()
-      if (result !== null) return
+      const { animationPhase, draft, machine, result, task } = get()
+      if (animationPhase !== null || result !== null) return
       const submitted = draftToAnswer(draft)
       if (submitted === null) return
       stopAuto()
 
       if (task.format === 'prediction' && machine.getStepCount() === 0) {
-        machine.step()
+        performLogicalStep()
       }
 
-      set((state) => ({
-        result: { correct: checkAnswer(task.answer, submitted), submitted },
-        revision: state.revision + 1,
-      }))
+      set({ result: { correct: checkAnswer(task.answer, submitted), submitted } })
     },
 
     retry: () => get().reset(),
@@ -178,7 +234,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     },
 
     toggleAuto: () => {
-      const { autoRunning, machine, result, task } = get()
+      const { animationPhase, autoRunning, machine, result, task } = get()
 
       if (autoRunning) {
         stopAuto()
@@ -186,7 +242,8 @@ export const useSessionStore = create<SessionState>((set, get) => {
       }
 
       if (
-        result !== null
+        animationPhase !== null
+        || result !== null
         || machine.isHalted()
         || (task.format === 'prediction' && machine.getStepCount() === 0)
       ) return
@@ -205,7 +262,18 @@ export const useSessionStore = create<SessionState>((set, get) => {
       )
       set({ autoSpeedMs: normalizedSpeed })
 
-      if (get().autoRunning) scheduleAutomaticStep()
+      if (get().autoRunning && get().animationPhase === null) {
+        schedule(runAutomaticStep, normalizedSpeed)
+      }
+    },
+
+    setReducedMotion: (reduced) => {
+      if (get().reducedMotion === reduced) return
+      set({ reducedMotion: reduced })
+
+      if (reduced && get().animationPhase !== null) {
+        finishVisualStep()
+      }
     },
   }
 })

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
+  ANIMATION_PHASE_MS,
   AUTO_SPEED_MAX,
   AUTO_SPEED_MIN,
   DEFAULT_AUTO_SPEED,
@@ -14,6 +15,7 @@ describe('автозапуск сессии', () => {
     store.selectTask('l1-command-reading-01')
     store.reset()
     store.setAutoSpeed(DEFAULT_AUTO_SPEED)
+    store.setReducedMotion(true)
   })
 
   afterEach(() => {
@@ -100,5 +102,93 @@ describe('автозапуск сессии', () => {
     expect(useSessionStore.getState().autoRunning).toBe(true)
     vi.advanceTimersByTime(1)
     expect(useSessionStore.getState().autoRunning).toBe(false)
+  })
+})
+
+describe('трёхфазная анимация', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    const store = useSessionStore.getState()
+    store.selectTask('l1-command-reading-01')
+    store.reset()
+    store.setAutoSpeed(DEFAULT_AUTO_SPEED)
+    store.setReducedMotion(false)
+  })
+
+  afterEach(() => {
+    useSessionStore.getState().stopAuto()
+    vi.clearAllTimers()
+    vi.useRealTimers()
+  })
+
+  it('меняет машину атомарно и последовательно показывает write, move, state', () => {
+    useSessionStore.getState().step()
+
+    expect(useSessionStore.getState().machine.getState()).toBe('q1')
+    expect(useSessionStore.getState().machine.getHeadPosition()).toBe(1)
+    expect(useSessionStore.getState().animationPhase).toBe('write')
+    expect(useSessionStore.getState().animatedStep).toMatchObject({
+      previousState: 'q0',
+      newState: 'q1',
+      previousHeadPosition: 0,
+      newHeadPosition: 1,
+    })
+
+    vi.advanceTimersByTime(ANIMATION_PHASE_MS)
+    expect(useSessionStore.getState().animationPhase).toBe('move')
+
+    vi.advanceTimersByTime(ANIMATION_PHASE_MS)
+    expect(useSessionStore.getState().animationPhase).toBe('state')
+
+    vi.advanceTimersByTime(ANIMATION_PHASE_MS)
+    expect(useSessionStore.getState().animationPhase).toBeNull()
+    expect(useSessionStore.getState().animatedStep).toBeNull()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('отключает визуальные фазы при reduced motion', () => {
+    useSessionStore.getState().setReducedMotion(true)
+    useSessionStore.getState().step()
+
+    expect(useSessionStore.getState().machine.getStepCount()).toBe(1)
+    expect(useSessionStore.getState().animationPhase).toBeNull()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('не запускает пересекающийся ручной шаг во время анимации', () => {
+    useSessionStore.getState().step()
+    useSessionStore.getState().step()
+
+    expect(useSessionStore.getState().machine.getStepCount()).toBe(1)
+    expect(useSessionStore.getState().animationPhase).toBe('write')
+    expect(vi.getTimerCount()).toBe(1)
+  })
+
+  it('ждёт завершения всех фаз перед интервалом следующего автоматического шага', () => {
+    useSessionStore.getState().toggleAuto()
+
+    expect(useSessionStore.getState().animationPhase).toBe('write')
+    expect(useSessionStore.getState().machine.getStepCount()).toBe(1)
+
+    vi.advanceTimersByTime(ANIMATION_PHASE_MS * 3)
+    expect(useSessionStore.getState().animationPhase).toBeNull()
+    expect(useSessionStore.getState().autoRunning).toBe(true)
+
+    vi.advanceTimersByTime(DEFAULT_AUTO_SPEED - 1)
+    expect(useSessionStore.getState().machine.isHalted()).toBe(false)
+    vi.advanceTimersByTime(1)
+    expect(useSessionStore.getState().machine.getHaltReason()).toBe('missing-command')
+    expect(useSessionStore.getState().autoRunning).toBe(false)
+  })
+
+  it('пауза отменяет оставшиеся визуальные фазы без повторного изменения машины', () => {
+    useSessionStore.getState().toggleAuto()
+    useSessionStore.getState().toggleAuto()
+    vi.advanceTimersByTime(2000)
+
+    expect(useSessionStore.getState().animationPhase).toBeNull()
+    expect(useSessionStore.getState().autoRunning).toBe(false)
+    expect(useSessionStore.getState().machine.getStepCount()).toBe(1)
+    expect(vi.getTimerCount()).toBe(0)
   })
 })
