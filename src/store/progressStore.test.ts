@@ -85,18 +85,14 @@ describe('рекомендации задач', () => {
     const supported = { ...baseAttempt, correct: true, hintsUsed: 1 }
     expect(getRecommendedTask([supported])?.id).toBe('l1-prediction-01')
 
-    const secondSolved: AttemptStats = {
+    const solvedOtherTasks = tasks.slice(1).map((task) => ({
       ...baseAttempt,
-      taskId: 'l1-prediction-01',
+      taskId: task.id,
       correct: true,
-    }
-    const traceSolved: AttemptStats = { ...secondSolved, taskId: 'l1-trace-01' }
-    const completionSolved: AttemptStats = { ...secondSolved, taskId: 'l1-completion-01' }
+    }))
     expect(getRecommendedTask([
       supported,
-      secondSolved,
-      traceSolved,
-      completionSolved,
+      ...solvedOtherTasks,
     ])?.id).toBe('l1-command-reading-01')
   })
 
@@ -105,11 +101,21 @@ describe('рекомендации задач', () => {
     if (current === undefined) throw new Error('Нет тестовой задачи')
 
     expect(getNextTask(current, [], 'learning')?.id).toBe('l1-completion-01')
-    expect(getNextTask(current, [{
+    const completionSolved: AttemptStats = {
       ...baseAttempt,
       taskId: 'l1-completion-01',
       correct: true,
-    }], 'learning')?.id).toBe('l1-prediction-01')
+    }
+    expect(getNextTask(current, [completionSolved], 'learning')?.id).toBe('l2-reverse-01')
+
+    const reverseSolved: AttemptStats = {
+      ...baseAttempt,
+      taskId: 'l2-reverse-01',
+      correct: true,
+    }
+    expect(getNextTask(current, [completionSolved, reverseSolved], 'learning')?.id).toBe(
+      'l1-prediction-01',
+    )
 
     const solvedOthers = tasks.slice(1).map((task) => ({
       ...baseAttempt,

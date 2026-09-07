@@ -16,6 +16,26 @@ describe('runtime-валидация задач', () => {
     expect(parseTasks(tasks)).toEqual(tasks)
   })
 
+  it('покрывает обязательную матрицу уровней 1 и 2', () => {
+    expect(tasks.filter((task) => task.level === 1).map((task) => task.format)).toEqual([
+      'command-reading', 'prediction', 'trace', 'completion',
+    ])
+    expect(tasks.filter((task) => task.level === 2).map((task) => task.format)).toEqual([
+      'algorithm', 'prediction', 'algorithm', 'reverse',
+    ])
+  })
+
+  it('останавливает все машины набора без достижения защитного лимита', () => {
+    for (const task of tasks) {
+      const machine = new TuringMachine(task.machine)
+
+      while (!machine.isHalted()) machine.step()
+
+      expect(machine.getHaltReason(), task.id).not.toBe('step-limit')
+      expect(machine.isHalted(), task.id).toBe(true)
+    }
+  })
+
   it('требует ровно три разные подсказки', () => {
     const task = getTask('l1-command-reading-01')
     const invalidTask: unknown = { ...task, hints: ['Только одна подсказка'] }
@@ -159,5 +179,84 @@ describe('эталонные шаги учебных задач', () => {
     expect(task.choices?.find((choice) => choice.value === 'write-0-left-q1')?.label).toContain(
       'Записать 0, сдвинуться влево, перейти в q1',
     )
+  })
+
+  it('подтверждает роль обратного прохода состояния return', () => {
+    const task = getTask('l2-state-role-01')
+    const machine = new TuringMachine(task.machine)
+    const trace = []
+
+    while (!machine.isHalted()) {
+      const result = machine.step()
+      if (result !== null) trace.push(result)
+    }
+
+    expect(trace).toHaveLength(8)
+    expect(trace.map((step) => step.previousState)).toEqual([
+      'scan', 'scan', 'scan', 'scan', 'return', 'return', 'return', 'return',
+    ])
+    expect(machine.getTapeView(1, 2)).toEqual([
+      { index: -1, symbol: 'λ' },
+      { index: 0, symbol: '0' },
+      { index: 1, symbol: '0' },
+      { index: 2, symbol: '0' },
+      { index: 3, symbol: 'λ' },
+    ])
+    expect(task.answer).toEqual({ type: 'choice', value: 'return-left-and-zero' })
+  })
+
+  it('подтверждает прогноз результата ровно трёх шагов', () => {
+    const task = getTask('l2-multi-prediction-01')
+    const machine = new TuringMachine(task.machine)
+
+    machine.step()
+    machine.step()
+    machine.step()
+
+    expect(machine.isHalted()).toBe(false)
+    expect(machine.getStepCount()).toBe(3)
+    expect(machine.countSymbol('1')).toBe(2)
+    expect(machine.getTapeView(1, 1)).toEqual([
+      { index: 0, symbol: '1' },
+      { index: 1, symbol: '0' },
+      { index: 2, symbol: '1' },
+    ])
+    expect(task.answer).toEqual({ type: 'count', symbol: '1', value: 2 })
+  })
+
+  it('подтверждает функцию дописывания единицы справа', () => {
+    const task = getTask('l2-algorithm-function-01')
+    const machine = new TuringMachine(task.machine)
+
+    while (!machine.isHalted()) machine.step()
+
+    expect(machine.getStepCount()).toBe(4)
+    expect(machine.countSymbol('1')).toBe(4)
+    expect(machine.getTapeView(2, 2)).toEqual([
+      { index: 0, symbol: '1' },
+      { index: 1, symbol: '1' },
+      { index: 2, symbol: '1' },
+      { index: 3, symbol: '1' },
+      { index: 4, symbol: 'λ' },
+    ])
+    expect(task.answer).toEqual({ type: 'choice', value: 'append-one' })
+  })
+
+  it('подтверждает обратный поиск предыдущего состояния', () => {
+    const task = getTask('l2-reverse-01')
+    const hypotheticalMachine = new TuringMachine({
+      ...task.machine,
+      initialTape: { 0: '0' },
+      initialState: 'qA',
+    })
+
+    expect(hypotheticalMachine.step()).toMatchObject({
+      read: '0',
+      written: '1',
+      direction: 'R',
+      previousState: 'qA',
+      newState: 'qB',
+    })
+    expect(task.answer).toEqual({ type: 'choice', value: 'qA' })
   })
 })

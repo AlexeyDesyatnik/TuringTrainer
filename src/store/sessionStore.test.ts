@@ -310,6 +310,37 @@ describe('фиксация статистики попытки', () => {
       errors: ['stop-step-not-counted'],
     })
   })
+
+  it('диагностирует неверный подсчёт символов', () => {
+    const store = useSessionStore.getState()
+    store.selectTask('l2-multi-prediction-01')
+    store.setNumericAnswer('3')
+    store.submitAnswer()
+
+    expect(useProgressStore.getState().attempts[0]).toMatchObject({
+      correct: false,
+      errors: ['wrong-count'],
+    })
+    expect(useSessionStore.getState().machine.getStepCount()).toBe(0)
+  })
+})
+
+describe('поведение задач уровня 2', () => {
+  beforeEach(() => {
+    const store = useSessionStore.getState()
+    store.setMode('learning')
+    store.selectTask('l2-state-role-01')
+    store.retry()
+    store.setReducedMotion(false)
+  })
+
+  it('выполняет шаг без трёхфазной анимации', () => {
+    useSessionStore.getState().step()
+
+    expect(useSessionStore.getState().machine.getStepCount()).toBe(1)
+    expect(useSessionStore.getState().animationPhase).toBeNull()
+    expect(useSessionStore.getState().animatedStep).toBeNull()
+  })
 })
 
 describe('экзаменационный режим', () => {

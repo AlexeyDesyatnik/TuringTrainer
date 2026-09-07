@@ -187,6 +187,15 @@ describe('экран учебной задачи', () => {
 
     fireEvent.change(screen.getByLabelText('Количество шагов'), { target: { value: '2.5' } })
     expect(submit).toBeDisabled()
+    fireEvent.change(screen.getByLabelText('Количество шагов'), { target: { value: '2' } })
+    fireEvent.click(submit)
+    expect(screen.getByRole('alert')).toHaveTextContent('Пока неверно')
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Останавливающая команда S не включена в число шагов.',
+    )
+    expect(screen.getByRole('alert')).toHaveTextContent('Следующий шаг:')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Решить ещё раз' }))
     fireEvent.change(screen.getByLabelText('Количество шагов'), { target: { value: '3' } })
     expect(submit).toBeEnabled()
     fireEvent.click(submit)
@@ -208,5 +217,20 @@ describe('экран учебной задачи', () => {
 
     expect(screen.getByRole('alert')).toHaveTextContent('Верно')
     expect(screen.getByRole('alert')).toHaveTextContent('0 · L · q1')
+  })
+
+  it('принимает ответ count в прогнозе нескольких шагов', () => {
+    useSessionStore.getState().selectTask('l2-multi-prediction-01')
+    useSessionStore.getState().retry()
+    render(<App />)
+
+    expect(screen.getByRole('heading', { name: 'Прогноз трёх шагов' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Шаг вперёд' })).toBeEnabled()
+    fireEvent.change(screen.getByLabelText('Количество символов 1'), { target: { value: '2' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Проверить ответ' }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Верно')
+    expect(screen.getByRole('alert')).toHaveTextContent('2 символа «1»')
+    expect(useSessionStore.getState().machine.getStepCount()).toBe(0)
   })
 })

@@ -111,6 +111,12 @@ export function skillLabel(skill: string): string {
     'machine-mechanics': 'Механика машины',
     'short-trace': 'Короткая трассировка',
     'command-completion': 'Восстановление команды',
+    'state-role': 'Роль состояния',
+    'cycle-analysis': 'Анализ цикла',
+    'multi-step-prediction': 'Прогноз нескольких шагов',
+    'algorithm-function': 'Функция алгоритма',
+    'one-way-pass': 'Однонаправленный проход',
+    'reverse-reasoning': 'Обратное рассуждение',
   }
   return labels[skill] ?? skill
 }

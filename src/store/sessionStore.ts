@@ -12,6 +12,7 @@ export type AnswerDraft =
   | { type: 'choice'; value: string }
   | { type: 'prediction'; write: string; direction: Direction | ''; nextState: string }
   | { type: 'steps'; value: string }
+  | { type: 'count'; symbol: string; value: string }
   | null
 
 export type AnimationPhase = 'write' | 'move' | 'state' | null
@@ -23,6 +24,7 @@ export interface AnswerResult {
   hintsUsed: number
   durationMs: number
   mode: AttemptMode
+  errors: string[]
 }
 
 export const AUTO_SPEED_MIN = 100
@@ -238,7 +240,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     step: () => {
       const { animationPhase, autoRunning, machine, result, task } = get()
       if (autoRunning || animationPhase !== null || result !== null) return
-      if (task.format === 'prediction' && machine.getStepCount() === 0) return
+      if (task.answer.type === 'prediction' && machine.getStepCount() === 0) return
       performLogicalStep()
     },
 
@@ -267,8 +269,9 @@ export const useSessionStore = create<SessionState>((set, get) => {
     },
 
     setNumericAnswer: (value) => {
-      if (get().result !== null || get().draft?.type !== 'steps') return
-      set({ draft: { type: 'steps', value }, result: null })
+      const { draft, result } = get()
+      if (result !== null || (draft?.type !== 'steps' && draft?.type !== 'count')) return
+      set({ draft: { ...draft, value }, result: null })
     },
 
     updatePrediction: (values) => {
@@ -295,6 +298,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       stopAuto()
 
       const correct = checkAnswer(task.answer, submitted)
+      const errors = correct ? [] : diagnoseErrors(task, submitted)
       const durationMs = Math.max(0, Date.now() - attemptStartedAtMs)
       stopExamTimer()
       const attempt: AttemptStats = {
@@ -306,11 +310,11 @@ export const useSessionStore = create<SessionState>((set, get) => {
         hintsUsed: openedHints,
         stepsExecuted: executedSteps,
         simulationUsage: getSimulationUsage(executedSteps, machine.isHalted()),
-        errors: correct ? [] : diagnoseErrors(task, submitted),
+        errors,
       }
       useProgressStore.getState().recordAttempt(attempt)
 
-      if (task.format === 'prediction' && machine.getStepCount() === 0) {
+      if (task.answer.type === 'prediction' && machine.getStepCount() === 0) {
         performLogicalStep()
       }
 
@@ -321,6 +325,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
           hintsUsed: openedHints,
           durationMs,
           mode,
+          errors,
         },
       })
     },
@@ -365,7 +370,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         animationPhase !== null
         || result !== null
         || machine.isHalted()
-        || (task.format === 'prediction' && machine.getStepCount() === 0)
+        || (task.answer.type === 'prediction' && machine.getStepCount() === 0)
       ) return
 
       set({ autoRunning: true })
@@ -460,6 +465,9 @@ function createDraft(task: Task): AnswerDraft {
     return { type: 'prediction', write: '', direction: '', nextState: '' }
   }
   if (task.answer.type === 'steps') return { type: 'steps', value: '' }
+  if (task.answer.type === 'count') {
+    return { type: 'count', symbol: task.answer.symbol, value: '' }
+  }
   return null
 }
 
@@ -474,6 +482,12 @@ function draftToAnswer(draft: AnswerDraft): TaskAnswer | null {
     const value = Number(draft.value)
     if (draft.value === '' || !Number.isInteger(value) || value < 0) return null
     return { type: 'steps', value }
+  }
+
+  if (draft.type === 'count') {
+    const value = Number(draft.value)
+    if (draft.value === '' || !Number.isInteger(value) || value < 0) return null
+    return { type: 'count', symbol: draft.symbol, value }
   }
 
   if (draft.write === '' || draft.direction === '' || draft.nextState === '') return null
@@ -503,6 +517,13 @@ function diagnoseErrors(task: Task, submitted: TaskAnswer): string[] {
     if (submitted.value === task.answer.value - 1) {
       addAvailable('stop-step-not-counted', 'wrong-count')
     } else if (submitted.value !== task.answer.value) {
+      addAvailable('wrong-count')
+    }
+    return [...errors]
+  }
+
+  if (task.answer.type === 'count' && submitted.type === 'count') {
+    if (submitted.value !== task.answer.value || submitted.symbol !== task.answer.symbol) {
       addAvailable('wrong-count')
     }
     return [...errors]
