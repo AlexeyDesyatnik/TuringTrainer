@@ -35,6 +35,7 @@ export function TaskScreen() {
   const autoSpeedMs = useSessionStore((state) => state.autoSpeedMs)
   const animationPhase = useSessionStore((state) => state.animationPhase)
   const animatedStep = useSessionStore((state) => state.animatedStep)
+  const lastStep = useSessionStore((state) => state.lastStep)
   const mode = useSessionStore((state) => state.mode)
   const elapsedMs = useSessionStore((state) => state.elapsedMs)
   const selectTask = useSessionStore((state) => state.selectTask)
@@ -83,6 +84,7 @@ export function TaskScreen() {
   const stepCount = machine.getStepCount()
   const predictionPending = task.answer.type === 'prediction' && stepCount === 0 && result === null
   const tape = machine.getTapeView(tapeCenter, 7)
+  const displayedStep = animatedStep ?? lastStep
 
   return (
     <main className="min-h-screen pb-16">
@@ -172,15 +174,8 @@ export function TaskScreen() {
             </div>
           </div>
 
-          {animationPhase !== null && animatedStep !== null && (
-            <div
-              aria-live="polite"
-              className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-950"
-              data-testid="animation-phase"
-            >
-              <strong>{animationPhaseLabel(animationPhase)}</strong>
-              <span>{animationDescription(animationPhase, animatedStep)}</span>
-            </div>
+          {displayedStep !== null && (
+            <StepExplanation phase={animationPhase} step={displayedStep} />
           )}
 
           <div className="overflow-x-auto rounded-2xl border border-slate-300 bg-white px-4 pb-4 pt-10 shadow-sm">
@@ -248,16 +243,19 @@ export function TaskScreen() {
                 </button>
               </div>
               <label className="mt-5 block text-sm font-semibold text-slate-200">
-                Скорость: {autoSpeedMs} мс
+                Темп: {animationTempoLabel(autoSpeedMs)}
                 <input
-                  aria-label="Скорость автозапуска"
+                  aria-label="Темп анимации"
+                  aria-valuetext={animationTempoLabel(autoSpeedMs)}
                   className="mt-3 block w-full accent-amber-300"
                   max={AUTO_SPEED_MAX}
                   min={AUTO_SPEED_MIN}
-                  onChange={(event) => setAutoSpeed(Number(event.target.value))}
-                  step="100"
+                  onChange={(event) => setAutoSpeed(
+                    AUTO_SPEED_MIN + AUTO_SPEED_MAX - Number(event.target.value),
+                  )}
+                  step="150"
                   type="range"
-                  value={autoSpeedMs}
+                  value={AUTO_SPEED_MIN + AUTO_SPEED_MAX - autoSpeedMs}
                 />
               </label>
               {predictionPending && (
@@ -278,6 +276,87 @@ export function TaskScreen() {
         <AnswerPanel task={task} draft={draft} animationActive={animationPhase !== null} />
       </div>
     </main>
+  )
+}
+
+function StepExplanation({ phase, step }: { phase: AnimationPhase; step: StepResult }) {
+  const replayLastStep = useSessionStore((state) => state.replayLastStep)
+  const phases: Array<{
+    id: Exclude<AnimationPhase, null>
+    label: string
+    detail: string
+  }> = [
+    {
+      id: 'write',
+      label: '1. Запись',
+      detail: `Ячейка ${step.previousHeadPosition}: ${displaySymbol(step.read)} → ${displaySymbol(step.written)}`,
+    },
+    {
+      id: 'move',
+      label: '2. Движение',
+      detail: `Головка: ${step.previousHeadPosition} → ${step.newHeadPosition}`,
+    },
+    {
+      id: 'state',
+      label: '3. Состояние',
+      detail: `Состояние: ${step.previousState} → ${step.newState}`,
+    },
+  ]
+  const activeIndex = phase === null ? phases.length : phases.findIndex((item) => item.id === phase)
+
+  return (
+    <section
+      aria-label="Разбор последнего шага"
+      aria-live="polite"
+      className="mb-4 rounded-2xl border border-violet-200 bg-violet-50 p-4 text-violet-950 shadow-sm"
+      data-testid="step-explanation"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-mono text-sm font-black">
+          Команда: {displaySymbol(step.written)} · {step.direction} · {step.newState}
+        </p>
+        <div className="flex items-center gap-3">
+          <p className="text-xs font-bold uppercase tracking-wide text-violet-700">
+            {phase === null ? 'Шаг завершён' : `${activeIndex + 1} из 3`}
+          </p>
+          {phase === null && (
+            <button
+              className="rounded-lg border border-violet-300 bg-white px-3 py-1.5 text-xs font-bold text-violet-800 transition hover:border-violet-500 hover:bg-violet-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
+              onClick={replayLastStep}
+              type="button"
+            >
+              Повторить анимацию
+            </button>
+          )}
+        </div>
+      </div>
+      {phase !== null && (
+        <p className="sr-only" data-testid="animation-phase">
+          {animationPhaseLabel(phase)}. {animationDescription(phase, step)}
+        </p>
+      )}
+      <ol className="mt-3 grid gap-2 md:grid-cols-3">
+        {phases.map((item, index) => {
+          const completed = phase === null || index < activeIndex
+          const active = index === activeIndex
+          return (
+            <li
+              className={`rounded-xl border px-3 py-3 text-sm ${
+                active
+                  ? 'border-violet-500 bg-white ring-2 ring-violet-200'
+                  : completed
+                    ? 'border-emerald-300 bg-emerald-50'
+                    : 'border-violet-100 bg-white/50 text-slate-500'
+              }`}
+              key={item.id}
+            >
+              <p className="font-bold">{completed ? '✓ ' : ''}{item.label}</p>
+              <p className="mt-1 font-mono text-xs">{item.detail}</p>
+            </li>
+          )
+        })}
+      </ol>
+    </section>
   )
 }
 
@@ -740,6 +819,12 @@ function formatDuration(durationMs: number): string {
   const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0')
   const seconds = (totalSeconds % 60).toString().padStart(2, '0')
   return `${minutes}:${seconds}`
+}
+
+function animationTempoLabel(durationMs: number): string {
+  if (durationMs <= 600) return 'Быстро'
+  if (durationMs <= 900) return 'Обычно'
+  return 'Медленно'
 }
 
 function animationPhaseLabel(phase: Exclude<AnimationPhase, null>): string {

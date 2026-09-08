@@ -11,6 +11,7 @@ describe('экран учебной задачи', () => {
     useSessionStore.getState().setMode('learning')
     useSessionStore.getState().selectTask('l1-command-reading-01')
     useSessionStore.getState().retry()
+    useSessionStore.getState().setAutoSpeed(ANIMATION_PHASE_MS)
     useSessionStore.getState().setReducedMotion(true)
     useSessionStore.getState().navigate('task')
   })
@@ -45,6 +46,13 @@ describe('экран учебной задачи', () => {
     expect(status).toHaveTextContent('Шагов 1')
     expect(screen.getByLabelText('Ячейка 1: 1, головка')).toBeInTheDocument()
     expect(back).toBeEnabled()
+
+    const stepExplanation = screen.getByTestId('step-explanation')
+    expect(stepExplanation).toHaveTextContent('Команда: 1 · R · q1')
+    expect(stepExplanation).toHaveTextContent('Ячейка 0: 0 → 1')
+    expect(stepExplanation).toHaveTextContent('Головка: 0 → 1')
+    expect(stepExplanation).toHaveTextContent('Состояние: q0 → q1')
+    expect(stepExplanation).toHaveTextContent('Шаг завершён')
 
     fireEvent.click(back)
     expect(status).toHaveTextContent('Состояние q0')
@@ -93,7 +101,7 @@ describe('экран учебной задачи', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(screen.getByTestId('animation-phase')).toHaveTextContent('1. Запись')
 
-    act(() => vi.advanceTimersByTime(ANIMATION_PHASE_MS * 3))
+    act(() => vi.advanceTimersByTime(2900))
 
     expect(screen.getByRole('alert')).toHaveTextContent('Верно')
     expect(screen.getByLabelText('Ячейка -1: 1, головка')).toBeInTheDocument()
@@ -134,12 +142,42 @@ describe('экран учебной задачи', () => {
     expect(screen.getByLabelText('Ячейка 1: 1, головка')).toBeInTheDocument()
     expect(screen.getByLabelText('Состояние машины')).toHaveTextContent('Состояние q0')
 
-    act(() => vi.advanceTimersByTime(ANIMATION_PHASE_MS))
+    act(() => vi.advanceTimersByTime(1100))
     expect(screen.getByTestId('animation-phase')).toHaveTextContent('3. Состояние')
     expect(screen.getByLabelText('Состояние машины')).toHaveTextContent('Состояние q1')
 
     act(() => vi.advanceTimersByTime(ANIMATION_PHASE_MS))
     expect(screen.queryByTestId('animation-phase')).not.toBeInTheDocument()
+  })
+
+  it('повторяет визуализацию последнего шага без повторного выполнения команды', () => {
+    vi.useFakeTimers()
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Шаг вперёд' }))
+    expect(useSessionStore.getState().machine.getStepCount()).toBe(1)
+
+    useSessionStore.getState().setReducedMotion(false)
+    fireEvent.click(screen.getByRole('button', { name: 'Повторить анимацию' }))
+
+    expect(screen.getByTestId('animation-phase')).toHaveTextContent('1. Запись')
+    expect(useSessionStore.getState().machine.getStepCount()).toBe(1)
+
+    act(() => vi.advanceTimersByTime(2900))
+    expect(screen.getByTestId('step-explanation')).toHaveTextContent('Шаг завершён')
+    expect(useSessionStore.getState().machine.getStepCount()).toBe(1)
+  })
+
+  it('показывает понятный темп и ускоряет анимацию при движении регулятора вправо', () => {
+    render(<App />)
+
+    const speed = screen.getByLabelText('Темп анимации')
+    expect(speed.parentElement).toHaveTextContent('Темп: Обычно')
+
+    fireEvent.change(speed, { target: { value: '1350' } })
+
+    expect(speed.parentElement).toHaveTextContent('Темп: Быстро')
+    expect(useSessionStore.getState().autoSpeedMs).toBe(450)
   })
 
   it('открывает подсказки последовательно и отдельно показывает самостоятельность', () => {

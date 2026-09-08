@@ -99,7 +99,7 @@ describe('автозапуск сессии', () => {
     vi.advanceTimersByTime(400)
     useSessionStore.getState().setAutoSpeed(AUTO_SPEED_MIN)
 
-    vi.advanceTimersByTime(99)
+    vi.advanceTimersByTime(AUTO_SPEED_MIN - 1)
     expect(useSessionStore.getState().autoRunning).toBe(true)
     vi.advanceTimersByTime(1)
     expect(useSessionStore.getState().autoRunning).toBe(false)
@@ -138,7 +138,7 @@ describe('трёхфазная анимация', () => {
     vi.advanceTimersByTime(ANIMATION_PHASE_MS)
     expect(useSessionStore.getState().animationPhase).toBe('move')
 
-    vi.advanceTimersByTime(ANIMATION_PHASE_MS)
+    vi.advanceTimersByTime(1100)
     expect(useSessionStore.getState().animationPhase).toBe('state')
 
     vi.advanceTimersByTime(ANIMATION_PHASE_MS)
@@ -147,18 +147,7 @@ describe('трёхфазная анимация', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 
-  it('показывает каждую фазу в течение 660 мс по умолчанию', () => {
-    useSessionStore.getState().step()
-
-    vi.advanceTimersByTime(659)
-    expect(useSessionStore.getState().animationPhase).toBe('write')
-
-    vi.advanceTimersByTime(1)
-    expect(useSessionStore.getState().animationPhase).toBe('move')
-  })
-
-  it('применяет выбранный темп к длительности визуальных фаз', () => {
-    useSessionStore.getState().setAutoSpeed(900)
+  it('показывает фазу записи в течение 900 мс по умолчанию', () => {
     useSessionStore.getState().step()
 
     vi.advanceTimersByTime(899)
@@ -166,6 +155,37 @@ describe('трёхфазная анимация', () => {
 
     vi.advanceTimersByTime(1)
     expect(useSessionStore.getState().animationPhase).toBe('move')
+  })
+
+  it('применяет выбранный темп к длительности визуальных фаз', () => {
+    useSessionStore.getState().setAutoSpeed(700)
+    useSessionStore.getState().step()
+
+    vi.advanceTimersByTime(699)
+    expect(useSessionStore.getState().animationPhase).toBe('write')
+
+    vi.advanceTimersByTime(1)
+    expect(useSessionStore.getState().animationPhase).toBe('move')
+  })
+
+  it('использует учебный ритм 900/1100/900 мс по умолчанию', () => {
+    useSessionStore.getState().setAutoSpeed(900)
+    useSessionStore.getState().step()
+
+    vi.advanceTimersByTime(899)
+    expect(useSessionStore.getState().animationPhase).toBe('write')
+    vi.advanceTimersByTime(1)
+    expect(useSessionStore.getState().animationPhase).toBe('move')
+
+    vi.advanceTimersByTime(1099)
+    expect(useSessionStore.getState().animationPhase).toBe('move')
+    vi.advanceTimersByTime(1)
+    expect(useSessionStore.getState().animationPhase).toBe('state')
+
+    vi.advanceTimersByTime(899)
+    expect(useSessionStore.getState().animationPhase).toBe('state')
+    vi.advanceTimersByTime(1)
+    expect(useSessionStore.getState().animationPhase).toBeNull()
   })
 
   it('отключает визуальные фазы при reduced motion', () => {
@@ -192,11 +212,11 @@ describe('трёхфазная анимация', () => {
     expect(useSessionStore.getState().animationPhase).toBe('write')
     expect(useSessionStore.getState().machine.getStepCount()).toBe(1)
 
-    vi.advanceTimersByTime(ANIMATION_PHASE_MS * 3)
+    vi.advanceTimersByTime(2900)
     expect(useSessionStore.getState().animationPhase).toBeNull()
     expect(useSessionStore.getState().autoRunning).toBe(true)
 
-    vi.advanceTimersByTime(DEFAULT_AUTO_SPEED - 1)
+    vi.advanceTimersByTime(599)
     expect(useSessionStore.getState().machine.isHalted()).toBe(false)
     vi.advanceTimersByTime(1)
     expect(useSessionStore.getState().machine.getHaltReason()).toBe('missing-command')
