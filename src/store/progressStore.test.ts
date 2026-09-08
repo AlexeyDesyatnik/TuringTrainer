@@ -53,6 +53,24 @@ describe('хранение прогресса', () => {
       attempts: [baseAttempt, { ...baseAttempt, durationMs: -1 }, null],
     }).attempts).toEqual([baseAttempt])
   })
+
+  it('экспортирует и полностью восстанавливает прогресс', () => {
+    useProgressStore.getState().recordAttempt(baseAttempt)
+    const backup = useProgressStore.getState().exportProgress()
+
+    useProgressStore.getState().clearProgress()
+    expect(useProgressStore.getState().importProgress(backup)).toBe(true)
+
+    expect(useProgressStore.getState().attempts).toEqual([baseAttempt])
+    expect(loadProgress(window.localStorage).attempts).toEqual([baseAttempt])
+  })
+
+  it('отклоняет повреждённый импорт без потери текущего прогресса', () => {
+    useProgressStore.getState().recordAttempt(baseAttempt)
+
+    expect(useProgressStore.getState().importProgress('{broken')).toBe(false)
+    expect(useProgressStore.getState().attempts).toEqual([baseAttempt])
+  })
 })
 
 describe('статус освоения навыка', () => {

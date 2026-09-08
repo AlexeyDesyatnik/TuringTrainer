@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { App } from './App'
@@ -57,6 +57,35 @@ describe('навигация приложения', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Начать рекомендованную задачу' }))
     expect(screen.getByRole('heading', { name: 'Предскажи следующий шаг' })).toBeInTheDocument()
+  })
+
+  it('восстанавливает прогресс из резервной копии на dashboard', async () => {
+    useSessionStore.getState().navigate('dashboard')
+    render(<App />)
+
+    expect(screen.getByRole('button', { name: 'Скачать прогресс' })).toBeInTheDocument()
+
+    const backup = JSON.stringify({
+      schemaVersion: 1,
+      attempts: [{
+        taskId: 'l1-command-reading-01',
+        mode: 'learning',
+        startedAt: '2026-09-07T12:00:00.000Z',
+        durationMs: 10_000,
+        correct: true,
+        hintsUsed: 0,
+        stepsExecuted: 0,
+        simulationUsage: 'none',
+        errors: [],
+      }],
+    })
+
+    fireEvent.change(screen.getByLabelText('Импортировать прогресс'), {
+      target: { files: [{ text: async () => backup }] },
+    })
+
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Прогресс восстановлен'))
+    expect(useProgressStore.getState().attempts).toHaveLength(1)
   })
 
   it('останавливает автозапуск при уходе с экрана задачи', () => {

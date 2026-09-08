@@ -1,3 +1,5 @@
+import { useState, type ChangeEvent } from 'react'
+
 import { tasks } from '../data/tasks'
 import { getRecommendedTask, getSkillStatus, useProgressStore } from '../store/progressStore'
 import { useSessionStore } from '../store/sessionStore'
@@ -6,6 +8,9 @@ import { skillLabel } from './TaskSelectorScreen'
 
 export function DashboardScreen() {
   const attempts = useProgressStore((state) => state.attempts)
+  const exportProgress = useProgressStore((state) => state.exportProgress)
+  const importProgress = useProgressStore((state) => state.importProgress)
+  const [transferStatus, setTransferStatus] = useState<string | null>(null)
   const navigate = useSessionStore((state) => state.navigate)
   const openTask = useSessionStore((state) => state.openTask)
   const setMode = useSessionStore((state) => state.setMode)
@@ -28,6 +33,34 @@ export function DashboardScreen() {
     if (recommendation === null) return
     setMode('learning')
     openTask(recommendation.id)
+  }
+
+  const downloadProgress = () => {
+    const blob = new Blob([exportProgress()], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `turing-trainer-progress-${new Date().toISOString().slice(0, 10)}.json`
+    document.body.append(link)
+    link.click()
+    link.remove()
+    window.setTimeout(() => URL.revokeObjectURL(url), 0)
+    setTransferStatus('Резервная копия скачана')
+  }
+
+  const restoreProgress = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (file === undefined) return
+
+    try {
+      const restored = importProgress(await file.text())
+      setTransferStatus(restored
+        ? 'Прогресс восстановлен из резервной копии'
+        : 'Не удалось восстановить прогресс: файл повреждён или имеет неизвестную версию')
+    } catch {
+      setTransferStatus('Не удалось прочитать файл резервной копии')
+    }
   }
 
   return (
@@ -116,6 +149,37 @@ export function DashboardScreen() {
                     </p>
                   ))}
                 </div>
+              )}
+            </section>
+
+            <section className="rounded-2xl border border-violet-200 bg-violet-50 p-5">
+              <h2 className="font-black text-slate-950">Перенос прогресса</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Скачай резервную копию перед переносом автономного тренажёра на другой компьютер.
+              </p>
+              <div className="mt-4 grid gap-2">
+                <button
+                  className="rounded-xl bg-violet-700 px-4 py-3 text-sm font-bold text-white hover:bg-violet-600"
+                  onClick={downloadProgress}
+                  type="button"
+                >
+                  Скачать прогресс
+                </button>
+                <label className="cursor-pointer rounded-xl border border-violet-300 bg-white px-4 py-3 text-center text-sm font-bold text-violet-800 hover:border-violet-500 hover:bg-violet-100">
+                  Загрузить из файла
+                  <input
+                    accept="application/json,.json"
+                    aria-label="Импортировать прогресс"
+                    className="sr-only"
+                    onChange={(event) => void restoreProgress(event)}
+                    type="file"
+                  />
+                </label>
+              </div>
+              {transferStatus !== null && (
+                <p className="mt-3 text-sm font-semibold text-violet-900" role="status">
+                  {transferStatus}
+                </p>
               )}
             </section>
           </aside>

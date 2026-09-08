@@ -11,11 +11,13 @@ export const MASTERY_TASK_THRESHOLD = 2
 interface ProgressState extends StoredProgress {
   recordAttempt: (attempt: AttemptStats) => void
   clearProgress: () => void
+  exportProgress: () => string
+  importProgress: (serialized: string) => boolean
 }
 
 const initialProgress = loadProgress(getBrowserStorage())
 
-export const useProgressStore = create<ProgressState>((set) => ({
+export const useProgressStore = create<ProgressState>((set, get) => ({
   ...initialProgress,
 
   recordAttempt: (attempt) => {
@@ -38,6 +40,20 @@ export const useProgressStore = create<ProgressState>((set) => ({
       // Storage may be blocked; in-memory progress still remains usable.
     }
     set(progress)
+  },
+
+  exportProgress: () => {
+    const { schemaVersion, attempts } = get()
+    return JSON.stringify({ schemaVersion, attempts }, null, 2)
+  },
+
+  importProgress: (serialized) => {
+    const progress = parseImportedProgress(serialized)
+    if (progress === null) return false
+
+    saveProgress(getBrowserStorage(), progress)
+    set(progress)
+    return true
   },
 }))
 
@@ -136,6 +152,28 @@ function saveProgress(storage: Storage | null, progress: StoredProgress): void {
     storage?.setItem(PROGRESS_STORAGE_KEY, JSON.stringify(progress))
   } catch {
     // A full or blocked storage must not break task submission.
+  }
+}
+
+function parseImportedProgress(serialized: string): StoredProgress | null {
+  try {
+    const value: unknown = JSON.parse(serialized)
+    if (
+      !isRecord(value)
+      || value.schemaVersion !== PROGRESS_SCHEMA_VERSION
+      || !Array.isArray(value.attempts)
+    ) return null
+
+    const attempts: AttemptStats[] = []
+    for (const attempt of value.attempts) {
+      const parsed = parseAttempt(attempt)
+      if (parsed === null) return null
+      attempts.push(parsed)
+    }
+
+    return { schemaVersion: PROGRESS_SCHEMA_VERSION, attempts }
+  } catch {
+    return null
   }
 }
 
