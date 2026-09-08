@@ -28,6 +28,7 @@ describe('экран учебной задачи', () => {
     expect(screen.getAllByLabelText(/^Ячейка /)).toHaveLength(15)
     expect(screen.getByLabelText('Ячейка 0: 0, головка')).toBeInTheDocument()
     expect(screen.getByRole('cell', { name: '1 · R · q1' })).toHaveAttribute('aria-current', 'step')
+    expect(screen.getByRole('button', { name: 'Шаг вперёд' })).toHaveClass('bg-amber-300')
   })
 
   it('выполняет шаг, отменяет его и сбрасывает машину', () => {
@@ -74,6 +75,9 @@ describe('экран учебной задачи', () => {
   })
 
   it('проверяет прогноз до выполнения фактического шага', () => {
+    vi.useFakeTimers()
+    useSessionStore.getState().setReducedMotion(false)
+    useSessionStore.getState().setAutoSpeed(ANIMATION_PHASE_MS)
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: '2. Предскажи следующий шаг' }))
 
@@ -85,6 +89,11 @@ describe('экран учебной задачи', () => {
     fireEvent.change(screen.getByLabelText('Направление движения'), { target: { value: 'L' } })
     fireEvent.change(screen.getByLabelText('Новое состояние'), { target: { value: 'check' } })
     fireEvent.click(screen.getByRole('button', { name: 'Проверить ответ' }))
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByTestId('animation-phase')).toHaveTextContent('1. Запись')
+
+    act(() => vi.advanceTimersByTime(ANIMATION_PHASE_MS * 3))
 
     expect(screen.getByRole('alert')).toHaveTextContent('Верно')
     expect(screen.getByLabelText('Ячейка -1: 1, головка')).toBeInTheDocument()

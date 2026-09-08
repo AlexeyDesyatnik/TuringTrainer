@@ -20,6 +20,8 @@ const primaryButton =
   'rounded-xl bg-slate-950 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-violet-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500'
 const secondaryButton =
   'rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-800 transition hover:border-violet-400 hover:text-violet-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400'
+const controlPrimaryButton =
+  'rounded-xl bg-amber-300 px-5 py-3 text-sm font-bold text-slate-950 shadow-sm transition hover:bg-amber-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400'
 const selectClass =
   'mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm text-slate-900 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-200'
 
@@ -226,7 +228,7 @@ export function TaskScreen() {
                   Шаг назад
                 </button>
                 <button
-                  className={primaryButton}
+                  className={controlPrimaryButton}
                   disabled={machine.isHalted() || predictionPending || result !== null || autoRunning || animationPhase !== null}
                   onClick={step}
                   type="button"
@@ -234,7 +236,7 @@ export function TaskScreen() {
                   Шаг вперёд
                 </button>
                 <button
-                  className={`${autoRunning ? primaryButton : secondaryButton} col-span-2`}
+                  className={`${autoRunning ? controlPrimaryButton : secondaryButton} col-span-2`}
                   disabled={!autoRunning && (machine.isHalted() || predictionPending || result !== null || animationPhase !== null)}
                   onClick={toggleAuto}
                   type="button"

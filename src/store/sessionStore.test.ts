@@ -147,6 +147,27 @@ describe('трёхфазная анимация', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 
+  it('показывает каждую фазу в течение 660 мс по умолчанию', () => {
+    useSessionStore.getState().step()
+
+    vi.advanceTimersByTime(659)
+    expect(useSessionStore.getState().animationPhase).toBe('write')
+
+    vi.advanceTimersByTime(1)
+    expect(useSessionStore.getState().animationPhase).toBe('move')
+  })
+
+  it('применяет выбранный темп к длительности визуальных фаз', () => {
+    useSessionStore.getState().setAutoSpeed(900)
+    useSessionStore.getState().step()
+
+    vi.advanceTimersByTime(899)
+    expect(useSessionStore.getState().animationPhase).toBe('write')
+
+    vi.advanceTimersByTime(1)
+    expect(useSessionStore.getState().animationPhase).toBe('move')
+  })
+
   it('отключает визуальные фазы при reduced motion', () => {
     useSessionStore.getState().setReducedMotion(true)
     useSessionStore.getState().step()

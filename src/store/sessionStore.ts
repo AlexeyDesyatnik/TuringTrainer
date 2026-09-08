@@ -31,8 +31,8 @@ export interface AnswerResult {
 
 export const AUTO_SPEED_MIN = 100
 export const AUTO_SPEED_MAX = 1000
-export const DEFAULT_AUTO_SPEED = 500
-export const ANIMATION_PHASE_MS = 220
+export const ANIMATION_PHASE_MS = 660
+export const DEFAULT_AUTO_SPEED = ANIMATION_PHASE_MS
 export const EXAM_TIMER_TICK_MS = 250
 
 interface SessionState {
@@ -41,6 +41,7 @@ interface SessionState {
   revision: number
   draft: AnswerDraft
   result: AnswerResult | null
+  pendingResult: AnswerResult | null
   autoRunning: boolean
   autoSpeedMs: number
   animationPhase: AnimationPhase
@@ -124,20 +125,28 @@ export const useSessionStore = create<SessionState>((set, get) => {
 
   function stopAuto(): void {
     clearExecutionTimer()
-    const { animatedStep, animationPhase, autoRunning } = get()
+    const { animatedStep, animationPhase, autoRunning, pendingResult } = get()
     if (!autoRunning && animationPhase === null && animatedStep === null) return
-    set({ autoRunning: false, animationPhase: null, animatedStep: null })
+    set({
+      autoRunning: false,
+      animationPhase: null,
+      animatedStep: null,
+      pendingResult: null,
+      result: pendingResult ?? get().result,
+    })
   }
 
   function finishVisualStep(): void {
     clearExecutionTimer()
-    const { autoRunning, machine } = get()
-    const shouldContinue = autoRunning && !machine.isHalted()
+    const { autoRunning, machine, pendingResult, result } = get()
+    const shouldContinue = pendingResult === null && autoRunning && !machine.isHalted()
 
     set({
       animationPhase: null,
       animatedStep: null,
       autoRunning: shouldContinue,
+      pendingResult: null,
+      result: pendingResult ?? result,
     })
 
     if (shouldContinue) schedule(runAutomaticStep, get().autoSpeedMs)
@@ -148,10 +157,10 @@ export const useSessionStore = create<SessionState>((set, get) => {
 
     if (animationPhase === 'write') {
       set({ animationPhase: 'move' })
-      schedule(advanceAnimation, ANIMATION_PHASE_MS)
+      schedule(advanceAnimation, get().autoSpeedMs)
     } else if (animationPhase === 'move') {
       set({ animationPhase: 'state' })
-      schedule(advanceAnimation, ANIMATION_PHASE_MS)
+      schedule(advanceAnimation, get().autoSpeedMs)
     } else if (animationPhase === 'state') {
       finishVisualStep()
     }
@@ -185,7 +194,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     }))
 
     if (shouldAnimate) {
-      schedule(advanceAnimation, ANIMATION_PHASE_MS)
+      schedule(advanceAnimation, get().autoSpeedMs)
     } else if (get().autoRunning) {
       schedule(runAutomaticStep, get().autoSpeedMs)
     }
@@ -208,6 +217,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     revision: 0,
     draft: createDraft(initialTask),
     result: null,
+    pendingResult: null,
     autoRunning: false,
     autoSpeedMs: DEFAULT_AUTO_SPEED,
     animationPhase: null,
@@ -232,6 +242,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         revision: state.revision + 1,
         draft: createDraft(task),
         result: null,
+        pendingResult: null,
         openedHints: 0,
         attemptStartedAtMs: Date.now(),
         executedSteps: 0,
@@ -263,6 +274,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         revision: state.revision + 1,
         draft: createDraft(task),
         result: null,
+        pendingResult: null,
       }))
     },
 
@@ -327,20 +339,24 @@ export const useSessionStore = create<SessionState>((set, get) => {
       }
       useProgressStore.getState().recordAttempt(attempt)
 
-      if (task.answer.type === 'prediction' && machine.getStepCount() === 0) {
-        performLogicalStep()
+      const answerResult: AnswerResult = {
+        correct,
+        submitted,
+        hintsUsed: openedHints,
+        durationMs,
+        mode,
+        errors,
       }
 
-      set({
-        result: {
-          correct,
-          submitted,
-          hintsUsed: openedHints,
-          durationMs,
-          mode,
-          errors,
-        },
-      })
+      if (task.answer.type === 'prediction' && machine.getStepCount() === 0) {
+        performLogicalStep()
+        if (get().animationPhase !== null) {
+          set({ pendingResult: answerResult })
+          return
+        }
+      }
+
+      set({ result: answerResult })
     },
 
     retry: () => {
@@ -352,6 +368,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         revision: state.revision + 1,
         draft: createDraft(task),
         result: null,
+        pendingResult: null,
         openedHints: 0,
         attemptStartedAtMs: Date.now(),
         executedSteps: 0,
@@ -440,6 +457,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         revision: state.revision + 1,
         draft: createDraft(task),
         result: null,
+        pendingResult: null,
         openedHints: 0,
       }))
       if (mode === 'exam' && get().screen === 'task') startExamTimer()
