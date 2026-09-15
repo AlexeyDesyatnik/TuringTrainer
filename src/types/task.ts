@@ -23,11 +23,13 @@ export type TaskAnswer =
 export interface TaskChoice {
   value: string
   label: string
+  mistakeType?: string
 }
 
 export interface CommonMistake {
   type: string
   description: string
+  nextAction: string
 }
 
 export interface TaskSource {

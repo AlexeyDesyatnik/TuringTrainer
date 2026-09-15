@@ -75,6 +75,10 @@ describe('экран учебной задачи', () => {
     expect(result).toHaveTextContent('Твой ответ: Записать 1, сдвинуться влево, перейти в q1')
     expect(result).toHaveTextContent('Правильный ответ: Записать 1, сдвинуться вправо, перейти в q1')
     expect(result).toHaveTextContent('Активную команду задаёт пара q0 и 0')
+    expect(result).toHaveTextContent('Перепутаны направления L и R.')
+    expect(result).toHaveTextContent(
+      'Следующий шаг: Сопоставь L с движением влево, а R — с движением вправо, затем перечитай среднюю часть активной команды.',
+    )
     expect(result).toHaveTextContent('Попытка сохранена на этом устройстве')
     expect(screen.getByLabelText('Сохранённый прогресс')).toHaveTextContent('Попыток: 1')
 

@@ -584,6 +584,14 @@ function diagnoseErrors(task: Task, submitted: TaskAnswer): string[] {
     if (code !== undefined) errors.add(code)
   }
 
+  if (task.answer.type === 'choice' && submitted.type === 'choice') {
+    const mistakeType = task.choices?.find(
+      (choice) => choice.value === submitted.value,
+    )?.mistakeType
+    if (mistakeType !== undefined) addAvailable(mistakeType)
+    return [...errors]
+  }
+
   if (task.answer.type === 'steps' && submitted.type === 'steps') {
     if (submitted.value === task.answer.value - 1) {
       addAvailable('stop-step-not-counted', 'wrong-count')

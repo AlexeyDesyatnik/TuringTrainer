@@ -364,6 +364,28 @@ describe('фиксация статистики попытки', () => {
     })
     expect(useSessionStore.getState().machine.getStepCount()).toBe(0)
   })
+
+  it.each([
+    ['l1-command-reading-01', 'write-1-left-q1', 'wrong-direction'],
+    ['l1-completion-01', 'write-1-left-q1', 'wrong-write-symbol'],
+    ['l2-state-role-01', 'return-stop-now', 'cycle-missed'],
+    ['l2-algorithm-function-01', 'move-only', 'stop-write-missed'],
+    ['l2-reverse-01', 'qB', 'current-vs-previous-state'],
+  ])('диагностирует выбранный дистрактор в задаче %s', (taskId, choice, mistakeType) => {
+    const store = useSessionStore.getState()
+    store.selectTask(taskId)
+    store.setChoice(choice)
+    store.submitAnswer()
+
+    expect(useSessionStore.getState().result).toMatchObject({
+      correct: false,
+      errors: [mistakeType],
+    })
+    expect(useProgressStore.getState().attempts[0]).toMatchObject({
+      taskId,
+      errors: [mistakeType],
+    })
+  })
 })
 
 describe('поведение задач уровня 2', () => {

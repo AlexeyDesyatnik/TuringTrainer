@@ -99,6 +99,66 @@ describe('runtime-валидация задач', () => {
     expect(() => parseTask(invalidTask)).toThrow('вариант missing-choice отсутствует в choices')
   })
 
+  it('связывает каждый неправильный choice-вариант с описанной ошибкой', () => {
+    for (const task of tasks.filter((candidate) => candidate.answer.type === 'choice')) {
+      if (task.answer.type !== 'choice') throw new Error('Ожидался ответ с выбором варианта')
+      const mistakeTypes = new Set(task.commonMistakes.map((mistake) => mistake.type))
+
+      for (const choice of task.choices ?? []) {
+        if (choice.value === task.answer.value) {
+          expect(choice.mistakeType, `${task.id}: правильный вариант`).toBeUndefined()
+        } else {
+          expect(choice.mistakeType, `${task.id}: ${choice.value}`).toBeDefined()
+          expect(mistakeTypes.has(choice.mistakeType ?? ''), `${task.id}: ${choice.value}`).toBe(true)
+        }
+      }
+    }
+  })
+
+  it('отклоняет неправильный choice-вариант без кода ошибки', () => {
+    const task = getTask('l1-command-reading-01')
+    const invalidTask: unknown = {
+      ...task,
+      choices: task.choices?.map((choice) => (
+        choice.value === 'write-1-left-q1'
+          ? { value: choice.value, label: choice.label }
+          : choice
+      )),
+    }
+
+    expect(() => parseTask(invalidTask)).toThrow('ожидалась непустая строка')
+  })
+
+  it('отклоняет choice-вариант со ссылкой на неизвестную ошибку', () => {
+    const task = getTask('l1-command-reading-01')
+    const invalidTask: unknown = {
+      ...task,
+      choices: task.choices?.map((choice) => (
+        choice.value === 'write-1-left-q1'
+          ? { ...choice, mistakeType: 'unknown-mistake' }
+          : choice
+      )),
+    }
+
+    expect(() => parseTask(invalidTask)).toThrow(
+      'код unknown-mistake отсутствует в commonMistakes',
+    )
+  })
+
+  it('требует корректирующее действие для каждой типичной ошибки', () => {
+    const task = getTask('l1-command-reading-01')
+    const invalidTask: unknown = {
+      ...task,
+      commonMistakes: task.commonMistakes.map((mistake, index) => (
+        index === 0
+          ? { type: mistake.type, description: mistake.description }
+          : mistake
+      )),
+    }
+
+    expect(() => parseTask(invalidTask)).toThrow('commonMistakes[0].nextAction')
+  })
+
   it('отклоняет повторяющиеся идентификаторы задач', () => {
     const task = getTask('l1-command-reading-01')
 

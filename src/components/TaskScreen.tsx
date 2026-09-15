@@ -763,12 +763,19 @@ function ResultDialog({ nextTask, result, retry, task }: {
             {result.errors.length > 0 && (
               <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-slate-700">
                 <p className="font-bold text-rose-900">Диагностика решения</p>
-                {result.errors.map((error) => (
-                  <p className="mt-1" key={error}>{mistakeDescription(task, error)}</p>
-                ))}
-                <p className="mt-2">
-                  <strong>Следующий шаг:</strong> реши задачу ещё раз и отдельно проверь действие, указанное в диагностике.
-                </p>
+                <ul className="mt-1 space-y-2">
+                  {result.errors.map((error) => {
+                    const mistake = task.commonMistakes.find((candidate) => candidate.type === error)
+                    return (
+                      <li key={error}>
+                        <p>{mistake?.description ?? error}</p>
+                        {mistake !== undefined && (
+                          <p><strong>Следующий шаг:</strong> {mistake.nextAction}</p>
+                        )}
+                      </li>
+                    )
+                  })}
+                </ul>
               </div>
             )}
             <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -889,10 +896,6 @@ function symbolsWord(value: number): string {
   if (lastDigit === 1) return 'символ'
   if (lastDigit >= 2 && lastDigit <= 4) return 'символа'
   return 'символов'
-}
-
-function mistakeDescription(task: Task, error: string): string {
-  return task.commonMistakes.find((mistake) => mistake.type === error)?.description ?? error
 }
 
 function formatTapeAnswer(tape: Record<number, string>): string {

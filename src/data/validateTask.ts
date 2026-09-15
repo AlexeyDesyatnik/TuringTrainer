@@ -85,6 +85,7 @@ function validateTask(value: unknown, path: string, issues: string[]): void {
   validateAnswer(value.answer, value.choices, `${path}.answer`, issues, alphabet, states)
   validateHints(value.hints, `${path}.hints`, issues)
   validateCommonMistakes(value.commonMistakes, `${path}.commonMistakes`, issues)
+  validateChoiceDiagnostics(value.answer, value.choices, value.commonMistakes, path, issues)
   validateSource(value.source, `${path}.source`, issues)
 }
 
@@ -279,9 +280,50 @@ function validateCommonMistakes(value: unknown, path: string, issues: string[]):
     }
     const code = requireString(mistake.type, `${path}[${index}].type`, issues)
     requireString(mistake.description, `${path}[${index}].description`, issues)
+    requireString(mistake.nextAction, `${path}[${index}].nextAction`, issues)
     if (code !== null) {
       if (codes.has(code)) issues.push(`${path}: коды ошибок должны быть уникальны`)
       codes.add(code)
+    }
+  })
+}
+
+function validateChoiceDiagnostics(
+  answerValue: unknown,
+  choicesValue: unknown,
+  mistakesValue: unknown,
+  path: string,
+  issues: string[],
+): void {
+  if (
+    !isRecord(answerValue)
+    || answerValue.type !== 'choice'
+    || typeof answerValue.value !== 'string'
+    || !Array.isArray(choicesValue)
+    || !Array.isArray(mistakesValue)
+  ) return
+
+  const mistakeTypes = new Set(
+    mistakesValue
+      .filter(isRecord)
+      .map((mistake) => mistake.type)
+      .filter((type): type is string => typeof type === 'string' && type.trim() !== ''),
+  )
+
+  choicesValue.forEach((choice, index) => {
+    if (!isRecord(choice) || typeof choice.value !== 'string') return
+
+    const choicePath = `${path}.choices[${index}].mistakeType`
+    if (choice.value === answerValue.value) {
+      if (choice.mistakeType !== undefined) {
+        issues.push(`${choicePath}: правильный вариант не должен иметь код ошибки`)
+      }
+      return
+    }
+
+    const mistakeType = requireString(choice.mistakeType, choicePath, issues)
+    if (mistakeType !== null && !mistakeTypes.has(mistakeType)) {
+      issues.push(`${choicePath}: код ${mistakeType} отсутствует в commonMistakes`)
     }
   })
 }
