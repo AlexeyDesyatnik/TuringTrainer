@@ -25,7 +25,7 @@ describe('навигация приложения', () => {
   it('проходит путь home → selector → task без React Router', () => {
     render(<App />)
 
-    expect(screen.getByRole('heading', { name: 'Не прокручивай машину. Пойми её.' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Когда трассировать, а когда рассуждать?' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Выбрать задачу' }))
 
     expect(screen.getByRole('heading', { name: 'Выбери мыслительное действие' })).toBeInTheDocument()
@@ -33,6 +33,19 @@ describe('навигация приложения', () => {
 
     expect(screen.getByRole('heading', { name: 'Предскажи следующий шаг' })).toBeInTheDocument()
     expect(useSessionStore.getState().screen).toBe('task')
+  })
+
+  it('показывает на главной методический контекст занятия', () => {
+    render(<App />)
+
+    expect(screen.getByText('11 класс')).toBeInTheDocument()
+    expect(screen.getByText('2 × 45 минут')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Не просто получить ответ' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Пять спринтов — один маршрут' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Диагностический маршрут' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Перекрёстная проверка' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Аналитическое решение' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Начать исследование' })).toBeInTheDocument()
   })
 
   it('показывает dashboard и открывает рекомендованную задачу', () => {
