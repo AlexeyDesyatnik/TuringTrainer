@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { App } from './App'
@@ -48,6 +48,61 @@ describe('навигация приложения', () => {
     expect(screen.getByRole('button', { name: 'Начать исследование' })).toBeInTheDocument()
   })
 
+  it('одинаково разделяет учебные и экзаменационные результаты на экранах', () => {
+    const progress = useProgressStore.getState()
+    progress.recordAttempt({
+      taskId: 'l1-command-reading-01',
+      mode: 'learning',
+      startedAt: '2026-09-07T12:00:00.000Z',
+      durationMs: 10_000,
+      correct: false,
+      hintsUsed: 0,
+      stepsExecuted: 0,
+      simulationUsage: 'none',
+      errors: ['wrong-direction'],
+    })
+    progress.recordAttempt({
+      taskId: 'l1-command-reading-01',
+      mode: 'learning',
+      startedAt: '2026-09-07T12:01:00.000Z',
+      durationMs: 8_000,
+      correct: true,
+      hintsUsed: 0,
+      stepsExecuted: 0,
+      simulationUsage: 'none',
+      errors: [],
+    })
+    progress.recordAttempt({
+      taskId: 'l2-state-role-01',
+      mode: 'exam',
+      startedAt: '2026-09-07T12:02:00.000Z',
+      durationMs: 12_000,
+      correct: true,
+      hintsUsed: 0,
+      stepsExecuted: 0,
+      simulationUsage: 'none',
+      errors: [],
+    })
+    render(<App />)
+
+    const trajectory = screen.getByLabelText('Текущая траектория')
+    expect(within(trajectory).getByText('Учебных попыток').parentElement).toHaveTextContent('2')
+    expect(within(trajectory).getByText('Верных учебных').parentElement).toHaveTextContent('1')
+    expect(within(trajectory).getByText('Самостоятельных').parentElement).toHaveTextContent('0')
+    expect(within(trajectory).getByText('Экзамен: верно / попыток').parentElement).toHaveTextContent(
+      '1 / 1',
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Открыть прогресс' }))
+    const summary = screen.getByLabelText('Сводка прогресса')
+    expect(within(summary).getByText('Учебных попыток').parentElement).toHaveTextContent('2')
+    expect(within(summary).getByText('Верных учебных').parentElement).toHaveTextContent('1')
+    expect(within(summary).getByText('Самостоятельных').parentElement).toHaveTextContent('0')
+    expect(within(summary).getByText('Экзамен: верно / попыток').parentElement).toHaveTextContent(
+      '1 / 1',
+    )
+  })
+
   it('показывает dashboard и открывает рекомендованную задачу', () => {
     useProgressStore.getState().recordAttempt({
       taskId: 'l1-command-reading-01',
@@ -70,6 +125,30 @@ describe('навигация приложения', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Начать рекомендованную задачу' }))
     expect(screen.getByRole('heading', { name: 'Предскажи следующий шаг' })).toBeInTheDocument()
+  })
+
+  it('объясняет, когда перенос навыка ещё нельзя проверить', () => {
+    useProgressStore.getState().recordAttempt({
+      taskId: 'l2-state-role-01',
+      mode: 'learning',
+      startedAt: '2026-09-07T12:00:00.000Z',
+      durationMs: 10_000,
+      correct: true,
+      hintsUsed: 0,
+      stepsExecuted: 0,
+      simulationUsage: 'none',
+      errors: [],
+    })
+    useSessionStore.getState().navigate('dashboard')
+    render(<App />)
+
+    const skillRow = screen.getByText('Роль состояния').parentElement?.parentElement
+    if (skillRow === null || skillRow === undefined) throw new Error('Не найдена строка навыка')
+    expect(within(skillRow).getByText('Самостоятельно')).toBeInTheDocument()
+    expect(within(skillRow).getByText(
+      'Самостоятельное решение подтверждено. Перенос пока не проверен: в банке только одна задача на навык.',
+    )).toBeInTheDocument()
+    expect(screen.queryByText('Освоено')).not.toBeInTheDocument()
   })
 
   it('восстанавливает прогресс из резервной копии на dashboard', async () => {

@@ -1,4 +1,4 @@
-import { useProgressStore } from '../store/progressStore'
+import { getProgressSummary, useProgressStore } from '../store/progressStore'
 import { useSessionStore } from '../store/sessionStore'
 
 const primaryButton =
@@ -62,10 +62,7 @@ export function HomeScreen() {
   const task = useSessionStore((state) => state.task)
   const mode = useSessionStore((state) => state.mode)
   const navigate = useSessionStore((state) => state.navigate)
-  const correct = attempts.filter((attempt) => attempt.correct).length
-  const independent = attempts.filter(
-    (attempt) => attempt.mode === 'learning' && attempt.correct && attempt.hintsUsed === 0,
-  ).length
+  const progress = getProgressSummary(attempts)
 
   return (
     <main className="min-h-screen overflow-hidden bg-slate-950 text-white">
@@ -144,18 +141,22 @@ export function HomeScreen() {
                 Уровень {task.level} · {mode === 'exam' ? 'экзаменационный' : 'учебный'} режим
               </p>
 
-              <dl className="mt-8 grid grid-cols-3 gap-3 text-center">
+              <dl className="mt-8 grid grid-cols-2 gap-3 text-center sm:grid-cols-4">
                 <div className="rounded-2xl border border-white/5 bg-slate-800/80 p-3">
-                  <dt className="text-xs text-slate-400">Попыток</dt>
-                  <dd className="mt-1 text-2xl font-black text-amber-300">{attempts.length}</dd>
+                  <dt className="text-xs text-slate-400">Учебных попыток</dt>
+                  <dd className="mt-1 text-2xl font-black text-amber-300">{progress.learningAttempts}</dd>
                 </div>
                 <div className="rounded-2xl border border-white/5 bg-slate-800/80 p-3">
-                  <dt className="text-xs text-slate-400">Верно</dt>
-                  <dd className="mt-1 text-2xl font-black text-emerald-300">{correct}</dd>
+                  <dt className="text-xs text-slate-400">Верных учебных</dt>
+                  <dd className="mt-1 text-2xl font-black text-emerald-300">{progress.learningCorrect}</dd>
                 </div>
                 <div className="rounded-2xl border border-white/5 bg-slate-800/80 p-3">
-                  <dt className="text-xs text-slate-400">Без подсказок</dt>
-                  <dd className="mt-1 text-2xl font-black text-violet-300">{independent}</dd>
+                  <dt className="text-xs text-slate-400">Самостоятельных</dt>
+                  <dd className="mt-1 text-2xl font-black text-violet-300">{progress.independentLearning}</dd>
+                </div>
+                <div className="rounded-2xl border border-white/5 bg-slate-800/80 p-3">
+                  <dt className="text-xs text-slate-400">Экзамен: верно / попыток</dt>
+                  <dd className="mt-1 text-2xl font-black text-sky-300">{progress.examCorrect} / {progress.examAttempts}</dd>
                 </div>
               </dl>
 

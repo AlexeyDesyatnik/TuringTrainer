@@ -7,7 +7,7 @@ import { tasks } from '../data/tasks'
 import type { Direction, StepResult } from '../types/machine'
 import type { AttemptMode, AttemptStats, SimulationUsage } from '../types/progress'
 import type { Task, TaskAnswer } from '../types/task'
-import { getNextTask, useProgressStore } from './progressStore'
+import { getNextTask, isIndependentLearningAttempt, useProgressStore } from './progressStore'
 
 export type AnswerDraft =
   | { type: 'choice'; value: string }
@@ -22,6 +22,7 @@ export type AppScreen = 'home' | 'selector' | 'task' | 'dashboard'
 
 export interface AnswerResult {
   correct: boolean
+  independent: boolean
   submitted: TaskAnswer
   hintsUsed: number
   durationMs: number
@@ -343,10 +344,13 @@ export const useSessionStore = create<SessionState>((set, get) => {
         simulationUsage,
         errors,
       }
-      useProgressStore.getState().recordAttempt(attempt)
+      const progress = useProgressStore.getState()
+      const independent = isIndependentLearningAttempt(attempt, progress.attempts)
+      progress.recordAttempt(attempt)
 
       const answerResult: AnswerResult = {
         correct,
+        independent,
         submitted,
         hintsUsed: openedHints,
         durationMs,

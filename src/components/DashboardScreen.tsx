@@ -1,7 +1,14 @@
 import { useState, type ChangeEvent } from 'react'
 
 import { tasks } from '../data/tasks'
-import { getRecommendedTask, getSkillStatus, useProgressStore } from '../store/progressStore'
+import {
+  getProgressSummary,
+  getRecommendedTask,
+  getSkillProgress,
+  MASTERY_TASK_THRESHOLD,
+  useProgressStore,
+  type SkillProgress,
+} from '../store/progressStore'
 import { useSessionStore } from '../store/sessionStore'
 import type { SkillStatus } from '../types/progress'
 import { skillLabel } from './TaskSelectorScreen'
@@ -16,11 +23,8 @@ export function DashboardScreen() {
   const setMode = useSessionStore((state) => state.setMode)
   const skills = [...new Set(tasks.flatMap((task) => task.skills))]
   const recommendation = getRecommendedTask(attempts)
+  const progress = getProgressSummary(attempts)
   const learningAttempts = attempts.filter((attempt) => attempt.mode === 'learning')
-  const examAttempts = attempts.filter((attempt) => attempt.mode === 'exam')
-  const independent = learningAttempts.filter(
-    (attempt) => attempt.correct && attempt.hintsUsed === 0,
-  ).length
   const solvedLearningTaskIds = new Set(
     learningAttempts.filter((attempt) => attempt.correct).map((attempt) => attempt.taskId),
   )
@@ -78,10 +82,10 @@ export function DashboardScreen() {
         </header>
 
         <section aria-label="Сводка прогресса" className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <Metric label="Учебных попыток" value={learningAttempts.length} />
-          <Metric label="Экзаменационных" value={examAttempts.length} />
-          <Metric label="Верных" value={attempts.filter((attempt) => attempt.correct).length} />
-          <Metric label="Самостоятельных" value={independent} />
+          <Metric label="Учебных попыток" value={progress.learningAttempts} />
+          <Metric label="Верных учебных" value={progress.learningCorrect} />
+          <Metric label="Самостоятельных" value={progress.independentLearning} />
+          <Metric label="Экзамен: верно / попыток" value={`${progress.examCorrect} / ${progress.examAttempts}`} />
         </section>
 
         <section aria-labelledby="levels-heading" className="mt-6">
@@ -106,12 +110,17 @@ export function DashboardScreen() {
             <h2 id="skills-heading" className="text-2xl font-black text-slate-950">Навыки</h2>
             <div className="mt-4 divide-y divide-slate-200">
               {skills.map((skill) => {
-                const status = getSkillStatus(attempts, skill)
+                const skillProgress = getSkillProgress(attempts, skill)
                 return (
-                  <div className="flex items-center justify-between gap-4 py-4" key={skill}>
-                    <span className="font-semibold text-slate-800">{skillLabel(skill)}</span>
-                    <span className={`rounded-full px-3 py-1 text-xs font-bold ${statusClass(status)}`}>
-                      {statusLabel(status)}
+                  <div className="grid gap-2 py-4 sm:grid-cols-[1fr_auto] sm:items-start sm:gap-4" key={skill}>
+                    <div>
+                      <span className="font-semibold text-slate-800">{skillLabel(skill)}</span>
+                      <p className="mt-1 text-sm leading-5 text-slate-500">
+                        {skillEvidenceLabel(skillProgress)}
+                      </p>
+                    </div>
+                    <span className={`w-fit rounded-full px-3 py-1 text-xs font-bold ${statusClass(skillProgress.status)}`}>
+                      {statusLabel(skillProgress.status)}
                     </span>
                   </div>
                 )
@@ -193,13 +202,35 @@ export function DashboardScreen() {
   )
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
+function Metric({ label, value }: { label: string; value: number | string }) {
   return (
     <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
       <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</p>
       <p className="mt-2 text-3xl font-black text-slate-950">{value}</p>
     </div>
   )
+}
+
+function skillEvidenceLabel(progress: SkillProgress): string {
+  if (progress.availableTaskCount < MASTERY_TASK_THRESHOLD) {
+    const evidence = progress.independentTaskCount > 0
+      ? 'Самостоятельное решение подтверждено. '
+      : ''
+    return `${evidence}Перенос пока не проверен: в банке только одна задача на навык.`
+  }
+  if (progress.status === 'mastered') {
+    return `Перенос подтверждён на ${progress.independentTaskCount} разных задачах.`
+  }
+  if (progress.independentTaskCount > 0) {
+    return 'Самостоятельно решена одна задача; для проверки переноса нужна ещё одна.'
+  }
+  if (progress.status === 'solves') {
+    return 'Есть верное решение с поддержкой; самостоятельность пока не подтверждена.'
+  }
+  if (progress.status === 'attempted') {
+    return 'Есть попытка; самостоятельное решение пока не подтверждено.'
+  }
+  return 'Попыток по навыку пока нет.'
 }
 
 function statusLabel(status: SkillStatus | 'not-started'): string {

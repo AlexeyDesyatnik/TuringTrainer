@@ -14,7 +14,7 @@ import {
 } from '../store/sessionStore'
 import type { Direction, HaltReason, StepResult } from '../types/machine'
 import type { Task, TaskAnswer } from '../types/task'
-import { useProgressStore } from '../store/progressStore'
+import { getProgressSummary, useProgressStore } from '../store/progressStore'
 
 const primaryButton =
   'rounded-xl bg-slate-950 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-violet-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500'
@@ -362,16 +362,11 @@ function StepExplanation({ phase, step }: { phase: AnimationPhase; step: StepRes
 
 function ProgressSummary() {
   const attempts = useProgressStore((state) => state.attempts)
-  const correct = attempts.filter((attempt) => attempt.correct).length
-  const learning = attempts.filter((attempt) => attempt.mode === 'learning').length
-  const exam = attempts.filter((attempt) => attempt.mode === 'exam').length
-  const independent = attempts.filter(
-    (attempt) => attempt.correct && attempt.hintsUsed === 0,
-  ).length
+  const progress = getProgressSummary(attempts)
 
   return (
     <p aria-label="Сохранённый прогресс" className="mt-2 text-right font-mono text-xs text-slate-400">
-      Попыток: {attempts.length} · учебных: {learning} · экзамен: {exam} · верно: {correct} · самостоятельно: {independent}
+      Учебный режим: попыток {progress.learningAttempts}, верно {progress.learningCorrect}, самостоятельно {progress.independentLearning} · экзамен: верно {progress.examCorrect} из {progress.examAttempts}
     </p>
   )
 }
@@ -747,9 +742,7 @@ function ResultDialog({ nextTask, result, retry, task }: {
               <div>
                 <dt className="inline font-bold">Самостоятельность: </dt>
                 <dd className="inline">
-                  {result.hintsUsed === 0
-                    ? 'самостоятельно, без подсказок'
-                    : `с поддержкой, подсказок использовано: ${result.hintsUsed}`}
+                  {independenceLabel(result)}
                 </dd>
               </div>
               <div>
@@ -896,6 +889,18 @@ function symbolsWord(value: number): string {
   if (lastDigit === 1) return 'символ'
   if (lastDigit >= 2 && lastDigit <= 4) return 'символа'
   return 'символов'
+}
+
+function independenceLabel(result: AnswerResult): string {
+  if (result.mode === 'exam') {
+    return 'экзаменационная попытка; в учебную самостоятельность не входит'
+  }
+  if (result.independent) return 'самостоятельное решение с первой попытки, без подсказок'
+  if (result.hintsUsed > 0) {
+    return `с поддержкой, подсказок использовано: ${result.hintsUsed}`
+  }
+  if (result.correct) return 'повторное решение после раскрытия ответа'
+  return 'без подсказок; самостоятельность не подтверждена'
 }
 
 function formatTapeAnswer(tape: Record<number, string>): string {

@@ -8,6 +8,20 @@ export const PROGRESS_SCHEMA_VERSION = 1
 export const PROGRESS_STORAGE_KEY = 'turing-trainer-progress'
 export const MASTERY_TASK_THRESHOLD = 2
 
+export interface ProgressSummary {
+  learningAttempts: number
+  learningCorrect: number
+  independentLearning: number
+  examAttempts: number
+  examCorrect: number
+}
+
+export interface SkillProgress {
+  status: SkillStatus | 'not-started'
+  availableTaskCount: number
+  independentTaskCount: number
+}
+
 interface ProgressState extends StoredProgress {
   recordAttempt: (attempt: AttemptStats) => void
   clearProgress: () => void
@@ -89,6 +103,13 @@ export function getSkillStatus(
   attempts: AttemptStats[],
   skill: string,
 ): SkillStatus | 'not-started' {
+  return getSkillProgress(attempts, skill).status
+}
+
+export function getSkillProgress(
+  attempts: AttemptStats[],
+  skill: string,
+): SkillProgress {
   const taskIds = new Set(
     tasks.filter((task) => task.skills.includes(skill)).map((task) => task.id),
   )
@@ -96,18 +117,57 @@ export function getSkillStatus(
     (attempt) => attempt.mode === 'learning' && taskIds.has(attempt.taskId),
   )
 
-  if (relevant.length === 0) return 'not-started'
-
   const independentTaskIds = new Set(
-    relevant
-      .filter((attempt) => attempt.correct && attempt.hintsUsed === 0)
+    getIndependentLearningAttempts(attempts)
+      .filter((attempt) => taskIds.has(attempt.taskId))
       .map((attempt) => attempt.taskId),
   )
 
-  if (independentTaskIds.size >= MASTERY_TASK_THRESHOLD) return 'mastered'
-  if (independentTaskIds.size > 0) return 'independent'
-  if (relevant.some((attempt) => attempt.correct)) return 'solves'
-  return 'attempted'
+  let status: SkillProgress['status'] = 'attempted'
+  if (relevant.length === 0) status = 'not-started'
+  else if (
+    taskIds.size >= MASTERY_TASK_THRESHOLD
+    && independentTaskIds.size >= MASTERY_TASK_THRESHOLD
+  ) status = 'mastered'
+  else if (independentTaskIds.size > 0) status = 'independent'
+  else if (relevant.some((attempt) => attempt.correct)) status = 'solves'
+
+  return {
+    status,
+    availableTaskCount: taskIds.size,
+    independentTaskCount: independentTaskIds.size,
+  }
+}
+
+export function isIndependentLearningAttempt(
+  attempt: AttemptStats,
+  previousAttempts: AttemptStats[],
+): boolean {
+  return isIndependentLearningCandidate(attempt)
+    && !previousAttempts.some((previous) => previous.taskId === attempt.taskId)
+}
+
+export function getIndependentLearningAttempts(attempts: AttemptStats[]): AttemptStats[] {
+  const seenTaskIds = new Set<string>()
+
+  return attempts.filter((attempt) => {
+    const isFirstAttempt = !seenTaskIds.has(attempt.taskId)
+    seenTaskIds.add(attempt.taskId)
+    return isFirstAttempt && isIndependentLearningCandidate(attempt)
+  })
+}
+
+export function getProgressSummary(attempts: AttemptStats[]): ProgressSummary {
+  const learningAttempts = attempts.filter((attempt) => attempt.mode === 'learning')
+  const examAttempts = attempts.filter((attempt) => attempt.mode === 'exam')
+
+  return {
+    learningAttempts: learningAttempts.length,
+    learningCorrect: learningAttempts.filter((attempt) => attempt.correct).length,
+    independentLearning: getIndependentLearningAttempts(attempts).length,
+    examAttempts: examAttempts.length,
+    examCorrect: examAttempts.filter((attempt) => attempt.correct).length,
+  }
 }
 
 export function getRecommendedTask(attempts: AttemptStats[]): Task | null {
@@ -116,8 +176,7 @@ export function getRecommendedTask(attempts: AttemptStats[]): Task | null {
     learningAttempts.filter((attempt) => attempt.correct).map((attempt) => attempt.taskId),
   )
   const independentTaskIds = new Set(
-    learningAttempts
-      .filter((attempt) => attempt.correct && attempt.hintsUsed === 0)
+    getIndependentLearningAttempts(attempts)
       .map((attempt) => attempt.taskId),
   )
 
@@ -222,6 +281,10 @@ function getBrowserStorage(): Storage | null {
 
 function isNonNegativeInteger(value: unknown): value is number {
   return Number.isInteger(value) && (value as number) >= 0
+}
+
+function isIndependentLearningCandidate(attempt: AttemptStats): boolean {
+  return attempt.mode === 'learning' && attempt.correct && attempt.hintsUsed === 0
 }
 
 function isNonNegativeNumber(value: unknown): value is number {

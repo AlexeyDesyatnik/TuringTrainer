@@ -72,6 +72,7 @@ describe('экран учебной задачи', () => {
 
     const result = screen.getByRole('alert')
     expect(result).toHaveTextContent('Пока неверно')
+    expect(result).toHaveTextContent('без подсказок; самостоятельность не подтверждена')
     expect(result).toHaveTextContent('Твой ответ: Записать 1, сдвинуться влево, перейти в q1')
     expect(result).toHaveTextContent('Правильный ответ: Записать 1, сдвинуться вправо, перейти в q1')
     expect(result).toHaveTextContent('Активную команду задаёт пара q0 и 0')
@@ -80,7 +81,9 @@ describe('экран учебной задачи', () => {
       'Следующий шаг: Сопоставь L с движением влево, а R — с движением вправо, затем перечитай среднюю часть активной команды.',
     )
     expect(result).toHaveTextContent('Попытка сохранена на этом устройстве')
-    expect(screen.getByLabelText('Сохранённый прогресс')).toHaveTextContent('Попыток: 1')
+    expect(screen.getByLabelText('Сохранённый прогресс')).toHaveTextContent(
+      'Учебный режим: попыток 1, верно 0, самостоятельно 0',
+    )
 
     fireEvent.click(screen.getByRole('button', { name: 'Решить ещё раз' }))
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
@@ -112,6 +115,23 @@ describe('экран учебной задачи', () => {
     expect(screen.getByLabelText('Состояние машины')).toHaveTextContent('Состояние check')
     expect(screen.getByLabelText('Направление движения')).toBeDisabled()
     expect(forward).toBeDisabled()
+  })
+
+  it('обозначает исправление после раскрытия ответа как повторное решение', () => {
+    render(<App />)
+
+    fireEvent.click(screen.getByLabelText('Записать 1, сдвинуться влево, перейти в q1'))
+    fireEvent.click(screen.getByRole('button', { name: 'Проверить ответ' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Решить ещё раз' }))
+    fireEvent.click(screen.getByLabelText('Записать 1, сдвинуться вправо, перейти в q1'))
+    fireEvent.click(screen.getByRole('button', { name: 'Проверить ответ' }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Самостоятельность: повторное решение после раскрытия ответа',
+    )
+    expect(screen.getByLabelText('Сохранённый прогресс')).toHaveTextContent(
+      'Учебный режим: попыток 2, верно 1, самостоятельно 0',
+    )
   })
 
   it('останавливает автозапуск при размонтировании экрана', () => {
@@ -222,7 +242,12 @@ describe('экран учебной задачи', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Проверить ответ' }))
 
     expect(screen.getByRole('alert')).toHaveTextContent('Режим и время: экзаменационный, 00:01')
-    expect(screen.getByLabelText('Сохранённый прогресс')).toHaveTextContent('экзамен: 1')
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Самостоятельность: экзаменационная попытка; в учебную самостоятельность не входит',
+    )
+    expect(screen.getByLabelText('Сохранённый прогресс')).toHaveTextContent(
+      'экзамен: верно 1 из 1',
+    )
     act(() => vi.advanceTimersByTime(2000))
     expect(useSessionStore.getState().elapsedMs).toBe(1000)
   })
@@ -315,6 +340,9 @@ describe('экран учебной задачи', () => {
     fireEvent.click(submit)
 
     const dialog = screen.getByRole('dialog', { name: 'Верно' })
+    expect(dialog).toHaveTextContent(
+      'Самостоятельность: самостоятельное решение с первой попытки, без подсказок',
+    )
     const title = within(dialog).getByRole('heading', { name: 'Верно' })
     const retry = within(dialog).getByRole('button', { name: 'Решить ещё раз' })
     const next = within(dialog).getByRole('button', { name: 'Следующая задача' })

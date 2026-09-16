@@ -2,9 +2,13 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import type { AttemptStats } from '../types/progress'
 import {
+  getIndependentLearningAttempts,
   getNextTask,
+  getProgressSummary,
   getRecommendedTask,
+  getSkillProgress,
   getSkillStatus,
+  isIndependentLearningAttempt,
   loadProgress,
   MASTERY_TASK_THRESHOLD,
   parseProgress,
@@ -94,6 +98,66 @@ describe('статус освоения навыка', () => {
     expect(getSkillStatus([independent], 'machine-mechanics')).toBe('independent')
     expect(getSkillStatus([independent, transfer], 'machine-mechanics')).toBe('mastered')
   })
+
+  it('не считает правильное повторение после раскрытия ответа самостоятельным', () => {
+    const wrong = baseAttempt
+    const repeatedSuccess: AttemptStats = {
+      ...baseAttempt,
+      correct: true,
+      startedAt: '2026-09-07T12:01:00.000Z',
+    }
+    const transfer: AttemptStats = {
+      ...baseAttempt,
+      taskId: 'l1-prediction-01',
+      correct: true,
+    }
+
+    expect(isIndependentLearningAttempt(repeatedSuccess, [wrong])).toBe(false)
+    expect(getIndependentLearningAttempts([wrong, repeatedSuccess])).toEqual([])
+    expect(getSkillStatus([wrong, repeatedSuccess, transfer], 'machine-mechanics')).toBe(
+      'independent',
+    )
+  })
+
+  it('не присваивает освоение навыку, для которого в банке нет второй задачи', () => {
+    const independent: AttemptStats = {
+      ...baseAttempt,
+      taskId: 'l2-state-role-01',
+      correct: true,
+    }
+    const repeated = {
+      ...independent,
+      startedAt: '2026-09-07T12:01:00.000Z',
+    }
+
+    expect(getSkillProgress([independent, repeated], 'state-role')).toEqual({
+      status: 'independent',
+      availableTaskCount: 1,
+      independentTaskCount: 1,
+    })
+  })
+
+  it('разделяет учебные и экзаменационные счётчики единым правилом', () => {
+    const firstSuccess: AttemptStats = { ...baseAttempt, correct: true }
+    const repeatedSuccess: AttemptStats = {
+      ...firstSuccess,
+      startedAt: '2026-09-07T12:01:00.000Z',
+    }
+    const examSuccess: AttemptStats = {
+      ...baseAttempt,
+      taskId: 'l2-state-role-01',
+      mode: 'exam',
+      correct: true,
+    }
+
+    expect(getProgressSummary([firstSuccess, repeatedSuccess, examSuccess])).toEqual({
+      learningAttempts: 2,
+      learningCorrect: 2,
+      independentLearning: 1,
+      examAttempts: 1,
+      examCorrect: 1,
+    })
+  })
 })
 
 describe('рекомендации задач', () => {
@@ -112,6 +176,21 @@ describe('рекомендации задач', () => {
       supported,
       ...solvedOtherTasks,
     ])?.id).toBe('l1-command-reading-01')
+  })
+
+  it('не принимает правильное повторение за самостоятельное решение', () => {
+    const repeatedSuccess = { ...baseAttempt, correct: true }
+
+    expect(getRecommendedTask([baseAttempt, repeatedSuccess])?.id).toBe('l1-prediction-01')
+
+    const solvedOtherTasks = tasks.slice(1).map((task) => ({
+      ...baseAttempt,
+      taskId: task.id,
+      correct: true,
+    }))
+    expect(getRecommendedTask([baseAttempt, repeatedSuccess, ...solvedOtherTasks])?.id).toBe(
+      'l1-command-reading-01',
+    )
   })
 
   it('выбирает следующую нерешённую задачу того же уровня', () => {

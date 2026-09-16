@@ -313,6 +313,7 @@ describe('фиксация статистики попытки', () => {
       simulationUsage: 'partial',
       errors: [],
     })
+    expect(useSessionStore.getState().result).toMatchObject({ independent: true })
   })
 
   it('не считает демонстрационный шаг после прогноза использованием симулятора', () => {
@@ -338,6 +339,25 @@ describe('фиксация статистики попытки', () => {
     store.submitAnswer()
 
     expect(useProgressStore.getState().attempts).toHaveLength(1)
+  })
+
+  it('не считает исправленный после показа ответа результат самостоятельным', () => {
+    const store = useSessionStore.getState()
+    store.setChoice('write-1-left-q1')
+    store.submitAnswer()
+    expect(useSessionStore.getState().result).toMatchObject({
+      correct: false,
+      independent: false,
+    })
+
+    store.retry()
+    store.setChoice('write-1-right-q1')
+    store.submitAnswer()
+
+    expect(useSessionStore.getState().result).toMatchObject({
+      correct: true,
+      independent: false,
+    })
   })
 
   it('диагностирует пропуск останавливающей команды при подсчёте шагов', () => {
@@ -471,6 +491,7 @@ describe('экзаменационный режим', () => {
     expect(useSessionStore.getState().elapsedMs).toBe(1250)
     expect(useSessionStore.getState().result).toMatchObject({
       mode: 'exam',
+      independent: false,
       durationMs: 1250,
       hintsUsed: 0,
     })
