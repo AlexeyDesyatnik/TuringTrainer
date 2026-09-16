@@ -3,11 +3,12 @@ import { useState, type ChangeEvent } from 'react'
 import { tasks } from '../data/tasks'
 import {
   getProgressSummary,
-  getRecommendedTask,
   getSkillProgress,
+  getTaskRecommendation,
   MASTERY_TASK_THRESHOLD,
   useProgressStore,
   type SkillProgress,
+  type TaskRecommendation,
 } from '../store/progressStore'
 import { useSessionStore } from '../store/sessionStore'
 import type { SkillStatus } from '../types/progress'
@@ -22,7 +23,7 @@ export function DashboardScreen() {
   const openTask = useSessionStore((state) => state.openTask)
   const setMode = useSessionStore((state) => state.setMode)
   const skills = [...new Set(tasks.flatMap((task) => task.skills))]
-  const recommendation = getRecommendedTask(attempts)
+  const recommendation = getTaskRecommendation(attempts)
   const progress = getProgressSummary(attempts)
   const learningAttempts = attempts.filter((attempt) => attempt.mode === 'learning')
   const solvedLearningTaskIds = new Set(
@@ -36,7 +37,7 @@ export function DashboardScreen() {
   const startRecommendation = () => {
     if (recommendation === null) return
     setMode('learning')
-    openTask(recommendation.id)
+    openTask(recommendation.task.id)
   }
 
   const downloadProgress = () => {
@@ -135,9 +136,12 @@ export function DashboardScreen() {
                 <p className="mt-3 leading-7 text-slate-200">Текущий набор решён самостоятельно. Можно переходить к новым задачам.</p>
               ) : (
                 <>
-                  <h2 className="mt-3 text-xl font-black">{recommendation.title}</h2>
+                  <h2 className="mt-3 text-xl font-black">{recommendation.task.title}</h2>
                   <p className="mt-2 text-sm leading-6 text-slate-300">
-                    Следующий шаг: {skillLabel(recommendation.skills[0] ?? '')}.
+                    {recommendationReasonLabel(recommendation)}
+                  </p>
+                  <p className="mt-2 text-xs font-bold uppercase tracking-wide text-slate-400">
+                    Фокус: {skillLabel(recommendation.task.skills[0] ?? '')}
                   </p>
                   <button className="mt-5 w-full rounded-xl bg-amber-300 px-4 py-3 font-bold text-slate-950 hover:bg-amber-200" onClick={startRecommendation} type="button">
                     Начать рекомендованную задачу
@@ -233,6 +237,27 @@ function skillEvidenceLabel(progress: SkillProgress): string {
   return 'Попыток по навыку пока нет.'
 }
 
+function recommendationReasonLabel(recommendation: TaskRecommendation): string {
+  const { reason } = recommendation
+  if (reason.type === 'error') {
+    const label = errorLabel(reason.error, reason.sourceTaskId).replace(/\.$/, '')
+    if (reason.attemptCount >= 2) {
+      return `Причина: ошибка «${label}» зафиксирована в ${reason.attemptCount} попытках.`
+    }
+    return `Причина: последняя диагностированная ошибка — «${label}».`
+  }
+  if (reason.type === 'independence-gap') {
+    return `По навыку «${skillLabel(reason.skill)}» пока нет самостоятельного решения.`
+  }
+  if (reason.type === 'transfer') {
+    return `По навыку «${skillLabel(reason.skill)}» уже есть одно самостоятельное решение; эта задача проверит перенос.`
+  }
+  if (reason.type === 'repeat-for-independence') {
+    return 'Задача решена, но самостоятельность с первой попытки не подтверждена.'
+  }
+  return 'Задача ещё не решена в учебном режиме.'
+}
+
 function statusLabel(status: SkillStatus | 'not-started'): string {
   const labels = {
     'not-started': 'Не начат',
@@ -252,8 +277,12 @@ function statusClass(status: SkillStatus | 'not-started'): string {
   return 'bg-slate-100 text-slate-600'
 }
 
-function errorLabel(error: string): string {
-  const mistake = tasks.flatMap((task) => task.commonMistakes).find((item) => item.type === error)
+function errorLabel(error: string, taskId?: string): string {
+  const taskMistake = tasks
+    .find((task) => task.id === taskId)
+    ?.commonMistakes.find((item) => item.type === error)
+  const mistake = taskMistake
+    ?? tasks.flatMap((task) => task.commonMistakes).find((item) => item.type === error)
   return mistake?.description ?? error
 }
 

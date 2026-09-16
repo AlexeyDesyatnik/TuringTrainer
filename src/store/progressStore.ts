@@ -22,6 +22,18 @@ export interface SkillProgress {
   independentTaskCount: number
 }
 
+export type RecommendationReason =
+  | { type: 'error'; error: string; attemptCount: number; sourceTaskId: string }
+  | { type: 'independence-gap'; skill: string }
+  | { type: 'transfer'; skill: string }
+  | { type: 'unsolved' }
+  | { type: 'repeat-for-independence' }
+
+export interface TaskRecommendation {
+  task: Task
+  reason: RecommendationReason
+}
+
 interface ProgressState extends StoredProgress {
   recordAttempt: (attempt: AttemptStats) => void
   clearProgress: () => void
@@ -171,6 +183,10 @@ export function getProgressSummary(attempts: AttemptStats[]): ProgressSummary {
 }
 
 export function getRecommendedTask(attempts: AttemptStats[]): Task | null {
+  return getTaskRecommendation(attempts)?.task ?? null
+}
+
+export function getTaskRecommendation(attempts: AttemptStats[]): TaskRecommendation | null {
   const learningAttempts = attempts.filter((attempt) => attempt.mode === 'learning')
   const solvedTaskIds = new Set(
     learningAttempts.filter((attempt) => attempt.correct).map((attempt) => attempt.taskId),
@@ -180,8 +196,145 @@ export function getRecommendedTask(attempts: AttemptStats[]): Task | null {
       .map((attempt) => attempt.taskId),
   )
 
-  return tasks.find((task) => !solvedTaskIds.has(task.id))
-    ?? tasks.find((task) => !independentTaskIds.has(task.id))
+  const errorFocus = getErrorFocus(attempts)
+  if (errorFocus !== null) {
+    const task = getTaskForError(
+      errorFocus.error,
+      errorFocus.sourceTaskId,
+      solvedTaskIds,
+      independentTaskIds,
+    )
+    if (task !== null) {
+      return {
+        task,
+        reason: {
+          type: 'error',
+          error: errorFocus.error,
+          attemptCount: errorFocus.attemptCount,
+          sourceTaskId: errorFocus.sourceTaskId,
+        },
+      }
+    }
+  }
+
+  const unsolvedTasks = tasks.filter((task) => !solvedTaskIds.has(task.id))
+  for (const task of unsolvedTasks) {
+    const skill = task.skills.find(
+      (candidate) => getSkillProgress(attempts, candidate).independentTaskCount === 0,
+    )
+    if (skill !== undefined) {
+      return { task, reason: { type: 'independence-gap', skill } }
+    }
+  }
+
+  for (const task of tasks) {
+    if (independentTaskIds.has(task.id)) continue
+    const skill = task.skills.find((candidate) => {
+      const progress = getSkillProgress(attempts, candidate)
+      return progress.availableTaskCount >= MASTERY_TASK_THRESHOLD
+        && progress.independentTaskCount > 0
+        && progress.independentTaskCount < MASTERY_TASK_THRESHOLD
+    })
+    if (skill !== undefined) return { task, reason: { type: 'transfer', skill } }
+  }
+
+  const firstUnsolved = unsolvedTasks[0]
+  if (firstUnsolved !== undefined) {
+    return { task: firstUnsolved, reason: { type: 'unsolved' } }
+  }
+
+  const firstNonIndependent = tasks.find((task) => !independentTaskIds.has(task.id))
+  if (firstNonIndependent !== undefined) {
+    return { task: firstNonIndependent, reason: { type: 'repeat-for-independence' } }
+  }
+
+  return null
+}
+
+interface ErrorFocus {
+  error: string
+  attemptCount: number
+  lastAttemptIndex: number
+  lastErrorIndex: number
+  firstSeenOrder: number
+  sourceTaskId: string
+}
+
+function getErrorFocus(attempts: AttemptStats[]): ErrorFocus | null {
+  const knownErrors = new Set(
+    tasks.flatMap((task) => task.commonMistakes.map((mistake) => mistake.type)),
+  )
+  const stats = new Map<string, ErrorFocus>()
+  let firstSeenOrder = 0
+
+  attempts.forEach((attempt, attemptIndex) => {
+    const distinctErrors = [...new Set(attempt.errors)]
+    distinctErrors.forEach((error, errorIndex) => {
+      if (!knownErrors.has(error)) return
+      const current = stats.get(error)
+      if (current === undefined) {
+        stats.set(error, {
+          error,
+          attemptCount: 1,
+          lastAttemptIndex: attemptIndex,
+          lastErrorIndex: errorIndex,
+          firstSeenOrder,
+          sourceTaskId: attempt.taskId,
+        })
+        firstSeenOrder += 1
+      } else {
+        current.attemptCount += 1
+        current.lastAttemptIndex = attemptIndex
+        current.lastErrorIndex = errorIndex
+        current.sourceTaskId = attempt.taskId
+      }
+    })
+  })
+
+  const unresolved = [...stats.values()].filter((focus) => {
+    const targetTaskIds = new Set(
+      tasks
+        .filter((task) => task.commonMistakes.some((mistake) => mistake.type === focus.error))
+        .map((task) => task.id),
+    )
+    return !attempts.slice(focus.lastAttemptIndex + 1).some(
+      (attempt) => attempt.mode === 'learning'
+        && attempt.correct
+        && attempt.errors.length === 0
+        && targetTaskIds.has(attempt.taskId),
+    )
+  })
+
+  const ordered = unresolved.sort((left, right) => (
+    Number(right.attemptCount >= 2) - Number(left.attemptCount >= 2)
+    || right.attemptCount - left.attemptCount
+    || right.lastAttemptIndex - left.lastAttemptIndex
+    || left.lastErrorIndex - right.lastErrorIndex
+    || left.firstSeenOrder - right.firstSeenOrder
+  ))
+
+  return ordered[0] ?? null
+}
+
+function getTaskForError(
+  error: string,
+  sourceTaskId: string,
+  solvedTaskIds: Set<string>,
+  independentTaskIds: Set<string>,
+): Task | null {
+  const candidates = tasks.filter(
+    (task) => task.commonMistakes.some((mistake) => mistake.type === error),
+  )
+
+  return candidates.find(
+    (task) => task.id !== sourceTaskId && !solvedTaskIds.has(task.id),
+  )
+    ?? candidates.find(
+      (task) => task.id !== sourceTaskId && !independentTaskIds.has(task.id),
+    )
+    ?? candidates.find((task) => !independentTaskIds.has(task.id))
+    ?? candidates.find((task) => task.id !== sourceTaskId)
+    ?? candidates[0]
     ?? null
 }
 

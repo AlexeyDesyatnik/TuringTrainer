@@ -127,6 +127,33 @@ describe('навигация приложения', () => {
     expect(screen.getByRole('heading', { name: 'Предскажи следующий шаг' })).toBeInTheDocument()
   })
 
+  it('объясняет рекомендацию повторяющейся диагностической ошибкой', () => {
+    const progress = useProgressStore.getState()
+    const attempt = {
+      taskId: 'l1-command-reading-01',
+      mode: 'learning' as const,
+      startedAt: '2026-09-07T12:00:00.000Z',
+      durationMs: 10_000,
+      correct: false,
+      hintsUsed: 0,
+      stepsExecuted: 0,
+      simulationUsage: 'none' as const,
+      errors: ['wrong-direction'],
+    }
+    progress.recordAttempt(attempt)
+    progress.recordAttempt({ ...attempt, startedAt: '2026-09-07T12:01:00.000Z' })
+    useSessionStore.getState().navigate('dashboard')
+    render(<App />)
+
+    expect(screen.getByRole('heading', { name: 'Предскажи следующий шаг' })).toBeInTheDocument()
+    expect(screen.getByText(
+      'Причина: ошибка «Перепутаны направления L и R» зафиксирована в 2 попытках.',
+    )).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Начать рекомендованную задачу' }))
+    expect(useSessionStore.getState().task.id).toBe('l1-prediction-01')
+  })
+
   it('объясняет, когда перенос навыка ещё нельзя проверить', () => {
     useProgressStore.getState().recordAttempt({
       taskId: 'l2-state-role-01',

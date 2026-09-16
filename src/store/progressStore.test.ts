@@ -8,6 +8,7 @@ import {
   getRecommendedTask,
   getSkillProgress,
   getSkillStatus,
+  getTaskRecommendation,
   isIndependentLearningAttempt,
   loadProgress,
   MASTERY_TASK_THRESHOLD,
@@ -161,6 +162,60 @@ describe('статус освоения навыка', () => {
 })
 
 describe('рекомендации задач', () => {
+  it('ставит повторяющуюся ошибку выше более поздней одиночной', () => {
+    const history: AttemptStats[] = [
+      { ...baseAttempt, errors: ['wrong-direction'] },
+      {
+        ...baseAttempt,
+        taskId: 'l1-completion-01',
+        startedAt: '2026-09-07T12:01:00.000Z',
+        errors: ['wrong-direction'],
+      },
+      {
+        ...baseAttempt,
+        startedAt: '2026-09-07T12:02:00.000Z',
+        errors: ['wrong-next-state'],
+      },
+    ]
+
+    expect(getTaskRecommendation(history)).toMatchObject({
+      task: { id: 'l1-command-reading-01' },
+      reason: { type: 'error', error: 'wrong-direction', attemptCount: 2 },
+    })
+    expect(getTaskRecommendation(history)).toEqual(getTaskRecommendation([...history]))
+  })
+
+  it('использует последнюю известную ошибку, если ни одна не повторяется', () => {
+    const history: AttemptStats[] = [
+      { ...baseAttempt, errors: ['wrong-direction'] },
+      {
+        ...baseAttempt,
+        startedAt: '2026-09-07T12:01:00.000Z',
+        errors: ['wrong-next-state'],
+      },
+    ]
+
+    expect(getTaskRecommendation(history)).toMatchObject({
+      task: { id: 'l1-completion-01' },
+      reason: { type: 'error', error: 'wrong-next-state', attemptCount: 1 },
+    })
+  })
+
+  it('снимает рекомендацию по ошибке после успешной проверочной задачи', () => {
+    const history: AttemptStats[] = [
+      { ...baseAttempt, errors: ['wrong-next-state'] },
+      {
+        ...baseAttempt,
+        taskId: 'l1-completion-01',
+        startedAt: '2026-09-07T12:01:00.000Z',
+        correct: true,
+        errors: [],
+      },
+    ]
+
+    expect(getTaskRecommendation(history)?.reason.type).not.toBe('error')
+  })
+
   it('сначала предлагает нерешённую, затем несамостоятельную задачу', () => {
     expect(getRecommendedTask([])?.id).toBe('l1-command-reading-01')
 
@@ -176,6 +231,17 @@ describe('рекомендации задач', () => {
       supported,
       ...solvedOtherTasks,
     ])?.id).toBe('l1-command-reading-01')
+
+    const transferHistory = tasks.map((task) => ({
+      ...baseAttempt,
+      taskId: task.id,
+      correct: true,
+      hintsUsed: task.id === 'l1-completion-01' ? 0 : 1,
+    }))
+    expect(getTaskRecommendation(transferHistory)?.reason).toEqual({
+      type: 'transfer',
+      skill: 'command-reading',
+    })
   })
 
   it('не принимает правильное повторение за самостоятельное решение', () => {
