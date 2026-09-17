@@ -9,33 +9,33 @@ const secondaryButton =
 const sprints = [
   {
     number: '01',
-    title: 'Исходная стратегия',
+    title: 'Первый способ решения',
     duration: '10 минут',
-    description: 'Решить входную задачу и честно записать первый способ рассуждения.',
+    description: 'Решить входную задачу и записать, как вы рассуждали.',
   },
   {
     number: '02',
-    title: 'Эксперимент',
+    title: 'Сравнение способов',
     duration: '20 минут',
-    description: 'Сравнить три попытки: время, шаги, подсказки, ошибки и результат.',
+    description: 'Решить задачи тремя способами и сравнить время, шаги, подсказки, ошибки и результат.',
   },
   {
     number: '03',
-    title: 'Закономерность',
+    title: 'Находим правило',
     duration: '15 минут',
-    description: 'Найти цикл или инвариант и проверить гипотезу на границе.',
+    description: 'Найти, что повторяется или не меняется, и проверить правило на граничном примере.',
   },
   {
     number: '04',
-    title: 'Сборка маршрута',
+    title: 'Собираем маршрут',
     duration: '30 минут',
-    description: 'Оформить правила выбора стратегии, пример и карту ошибок.',
+    description: 'Записать, когда выбирать каждый способ, и добавить пример и карту ошибок.',
   },
   {
     number: '05',
-    title: 'Перекрёстная проверка',
+    title: 'Проверяем друг у друга',
     duration: '15 минут',
-    description: 'Передать маршрут другой команде и исправить неоднозначности.',
+    description: 'Передать маршрут другой команде и исправить непонятные места.',
   },
 ]
 
@@ -47,13 +47,13 @@ const strategyBranches = [
   },
   {
     marker: 'B',
-    title: 'Проверочные шаги',
-    description: 'Когда нужно подтвердить гипотезу, но не исполнять всю машину.',
+    title: 'Несколько проверочных шагов',
+    description: 'Когда нужно проверить предположение, но не выполнять все шаги машины.',
   },
   {
     marker: 'C',
     title: 'Аналитическое решение',
-    description: 'Когда цикл, роль состояния или инвариант уже доказаны.',
+    description: 'Когда уже понятно, что повторяется или остаётся неизменным.',
   },
 ]
 
@@ -74,7 +74,7 @@ export function HomeScreen() {
             </span>
             <span>
               <strong className="block text-sm leading-tight">Тьюринг под лупой</strong>
-              <span className="block text-xs text-slate-400">исследовательское занятие</span>
+              <span className="block text-xs text-slate-400">проектное занятие</span>
             </span>
           </a>
 
@@ -114,11 +114,11 @@ export function HomeScreen() {
               <span className="block text-slate-400">а когда рассуждать?</span>
             </h1>
             <p className="mt-7 max-w-2xl text-lg leading-8 text-slate-300">
-              Тренажёр становится исследовательским стендом: сравните собственные решения, найдите закономерность и создайте диагностический маршрут для другой команды.
+              Сравните в тренажёре несколько способов решения, найдите правило и составьте для другой команды понятную схему выбора.
             </p>
             <div className="mt-9 flex flex-wrap gap-3">
               <button className={primaryButton} onClick={() => navigate('task')} type="button">
-                {attempts.length === 0 ? 'Начать исследование' : 'Продолжить исследование'}
+                {attempts.length === 0 ? 'Начать работу' : 'Продолжить работу'}
               </button>
               <button className={secondaryButton} onClick={() => navigate('selector')} type="button">
                 Выбрать задачу
@@ -129,12 +129,12 @@ export function HomeScreen() {
             </div>
           </div>
 
-          <aside className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-slate-900/80 p-6 shadow-2xl shadow-violet-950/40 backdrop-blur sm:p-8" aria-label="Текущая траектория">
+          <aside className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-slate-900/80 p-6 shadow-2xl shadow-violet-950/40 backdrop-blur sm:p-8" aria-label="Текущий прогресс">
             <div className="absolute -right-14 -top-14 h-44 w-44 rounded-full bg-violet-600/30 blur-3xl" />
             <div className="relative">
               <div className="flex items-center justify-between gap-4">
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Текущая траектория</p>
-                <span className="rounded-full bg-emerald-300/10 px-3 py-1 text-xs font-bold text-emerald-200">стенд готов</span>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Где вы сейчас</p>
+                <span className="rounded-full bg-emerald-300/10 px-3 py-1 text-xs font-bold text-emerald-200">можно начинать</span>
               </div>
               <h2 className="mt-4 text-2xl font-black">{task.title}</h2>
               <p className="mt-2 text-sm leading-6 text-slate-300">
@@ -161,11 +161,11 @@ export function HomeScreen() {
               </dl>
 
               <div className="mt-8 border-t border-white/10 pt-6">
-                <p className="font-mono text-xs uppercase tracking-[0.18em] text-slate-500">Траектория мышления</p>
+                <p className="font-mono text-xs uppercase tracking-[0.18em] text-slate-500">Как будем работать</p>
                 <ol className="mt-4 space-y-3 text-sm text-slate-300">
-                  <li className="flex gap-3"><strong className="text-white">01</strong><span>Предскажи точный шаг</span></li>
-                  <li className="flex gap-3"><strong className="text-white">02</strong><span>Проверь цикл и роль состояния</span></li>
-                  <li className="flex gap-3"><strong className="text-white">03</strong><span>Обоснуй решение без полного перебора</span></li>
+                  <li className="flex gap-3"><strong className="text-white">01</strong><span>Предскажи следующий шаг</span></li>
+                  <li className="flex gap-3"><strong className="text-white">02</strong><span>Найди, что повторяется</span></li>
+                  <li className="flex gap-3"><strong className="text-white">03</strong><span>Реши без полной трассировки и объясни способ</span></li>
                 </ol>
               </div>
             </div>
@@ -179,16 +179,16 @@ export function HomeScreen() {
             <p className="font-mono text-xs font-bold uppercase tracking-[0.2em] text-violet-300">Задача занятия</p>
             <h2 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl" id="question-title">Не просто получить ответ</h2>
             <p className="mt-5 max-w-md leading-7 text-slate-400">
-              Полная трассировка помогает увидеть механику, но на длинной ленте превращается в источник ошибок. Нужно научиться вовремя менять стратегию.
+              Полная трассировка помогает понять работу машины. Но на длинной ленте она занимает много времени и повышает риск ошибки. Важно вовремя выбрать другой способ.
             </p>
           </div>
 
           <blockquote className="relative rounded-[2rem] border border-violet-300/20 bg-violet-300/[0.07] p-7 sm:p-10">
             <span className="absolute right-7 top-4 font-serif text-7xl leading-none text-violet-300/20" aria-hidden="true">?</span>
             <p className="max-w-3xl text-2xl font-bold leading-snug text-white sm:text-3xl">
-              Как по данным собственных решений определить, когда пошаговая симуляция помогает, а когда пора переходить к аналитическому решению?
+              Как понять по своим решениям, когда полезна полная трассировка, а когда лучше найти правило и решить задачу без неё?
             </p>
-            <footer className="mt-6 text-sm font-semibold text-violet-200">Проектный вопрос команды</footer>
+            <footer className="mt-6 text-sm font-semibold text-violet-200">Главный вопрос команды</footer>
           </blockquote>
         </div>
       </section>
@@ -197,9 +197,9 @@ export function HomeScreen() {
         <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
           <div>
             <p className="font-mono text-xs font-bold uppercase tracking-[0.2em] text-amber-300">90 минут практики</p>
-            <h2 className="mt-4 text-3xl font-black tracking-tight sm:text-5xl" id="lesson-plan-title">Пять спринтов — один маршрут</h2>
+            <h2 className="mt-4 text-3xl font-black tracking-tight sm:text-5xl" id="lesson-plan-title">Пять шагов — один маршрут</h2>
           </div>
-          <p className="max-w-xl leading-7 text-slate-400">Каждый этап оставляет проверяемый след: от исходной гипотезы до продукта, который работает без пояснений авторов.</p>
+          <p className="max-w-xl leading-7 text-slate-400">После каждого шага остаётся результат, который можно проверить: от первого предположения до маршрута, понятного без объяснений авторов.</p>
         </div>
 
         <ol className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-5">
@@ -221,15 +221,15 @@ export function HomeScreen() {
             <p className="font-mono text-xs font-bold uppercase tracking-[0.2em] text-emerald-300">Результат команды</p>
             <h2 className="mt-4 text-3xl font-black tracking-tight sm:text-5xl" id="product-title">Диагностический маршрут</h2>
             <p className="mt-6 max-w-xl text-lg leading-8 text-slate-300">
-              Не реферат и не пересказ правил, а проверенный на данных инструмент, который помогает другому ученику выбрать способ решения и исправить типичную ошибку.
+              Диагностический маршрут — это проверенная на данных схема, которая помогает другому ученику выбрать способ решения и исправить ошибку.
             </p>
 
             <ul className="mt-8 grid gap-3 text-sm text-slate-300 sm:grid-cols-2">
               {[
-                'данные не менее трёх попыток',
+                'результаты не менее трёх попыток',
                 'обычный и граничный пример',
-                'карта минимум из трёх ошибок',
-                'независимая проверка другой командой',
+                'не менее трёх ошибок и способов их исправить',
+                'проверка маршрута другой командой',
               ].map((item) => (
                 <li className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3" key={item}>
                   <span className="mt-0.5 text-emerald-300" aria-hidden="true">✓</span>
@@ -242,8 +242,8 @@ export function HomeScreen() {
           <div className="rounded-[2rem] border border-white/10 bg-slate-950 p-6 sm:p-8">
             <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-5">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Условие → стратегия</p>
-                <h3 className="mt-2 text-xl font-black">Три ветви решения</h3>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Условие → способ решения</p>
+                <h3 className="mt-2 text-xl font-black">Три способа решения</h3>
               </div>
               <span className="font-mono text-xs text-slate-500">IF / THEN</span>
             </div>
@@ -266,20 +266,20 @@ export function HomeScreen() {
       <section className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:px-10 lg:py-24" aria-labelledby="evidence-title">
         <div className="rounded-[2.25rem] border border-amber-300/20 bg-amber-300/[0.07] px-6 py-10 sm:px-10 lg:flex lg:items-center lg:justify-between lg:gap-12 lg:px-12">
           <div className="max-w-2xl">
-            <p className="font-mono text-xs font-bold uppercase tracking-[0.2em] text-amber-300">Готовы проверить гипотезу?</p>
+            <p className="font-mono text-xs font-bold uppercase tracking-[0.2em] text-amber-300">Готовы проверить своё предположение?</p>
             <h2 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl" id="evidence-title">Сначала прогноз. Затем — данные.</h2>
-            <p className="mt-4 leading-7 text-slate-300">Начните с точного шага, сохраните результаты попыток и вернитесь к ним при сборке маршрута.</p>
+            <p className="mt-4 leading-7 text-slate-300">Сначала предскажите следующий шаг, затем проверьте себя. Результаты попыток понадобятся при сборке маршрута.</p>
           </div>
           <div className="mt-8 flex flex-wrap gap-3 lg:mt-0 lg:shrink-0">
             <button className={primaryButton} onClick={() => navigate('task')} type="button">Перейти к первой задаче</button>
-            <button className={secondaryButton} onClick={() => navigate('dashboard')} type="button">Данные попыток</button>
+            <button className={secondaryButton} onClick={() => navigate('dashboard')} type="button">Результаты попыток</button>
           </div>
         </div>
       </section>
 
       <footer className="border-t border-white/10 px-5 py-8 text-sm text-slate-500 sm:px-8">
         <div className="mx-auto flex max-w-7xl flex-col justify-between gap-2 sm:flex-row lg:px-2">
-          <span>Тьюринг под лупой · методическая разработка учебного занятия</span>
+          <span>Тьюринг под лупой · проектное занятие</span>
           <span>Информатика × математика</span>
         </div>
       </footer>

@@ -41,11 +41,11 @@ describe('навигация приложения', () => {
     expect(screen.getByText('11 класс')).toBeInTheDocument()
     expect(screen.getByText('2 × 45 минут')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Не просто получить ответ' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Пять спринтов — один маршрут' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Пять шагов — один маршрут' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Диагностический маршрут' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Перекрёстная проверка' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Проверяем друг у друга' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Аналитическое решение' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Начать исследование' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Начать работу' })).toBeInTheDocument()
   })
 
   it('одинаково разделяет учебные и экзаменационные результаты на экранах', () => {
@@ -85,7 +85,7 @@ describe('навигация приложения', () => {
     })
     render(<App />)
 
-    const trajectory = screen.getByLabelText('Текущая траектория')
+    const trajectory = screen.getByLabelText('Текущий прогресс')
     expect(within(trajectory).getByText('Учебных попыток').parentElement).toHaveTextContent('2')
     expect(within(trajectory).getByText('Верных учебных').parentElement).toHaveTextContent('1')
     expect(within(trajectory).getByText('Самостоятельных').parentElement).toHaveTextContent('0')
