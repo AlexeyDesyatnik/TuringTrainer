@@ -158,7 +158,7 @@ export function TaskScreen() {
         <section aria-labelledby="tape-heading" className="py-7">
           <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Симулятор</p>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Тренажёр</p>
               <h3 id="tape-heading" className="mt-1 text-xl font-black text-slate-950">Лента машины</h3>
             </div>
             <div
@@ -389,7 +389,7 @@ function HintPanel({ task, animationActive }: { task: Task; animationActive: boo
       ) : (
         <>
       <p className="mt-2 text-sm leading-6 text-slate-600">
-        Помощь не снижает правильность, но учитывается отдельно.
+        Ответ с подсказкой может быть верным, но такая попытка не считается самостоятельной.
       </p>
 
       {openedHints > 0 && (
@@ -740,7 +740,7 @@ function ResultDialog({ nextTask, result, retry, task }: {
               <div><dt className="inline font-bold">Твой ответ: </dt><dd className="inline">{formatAnswer(task, result.submitted)}</dd></div>
               <div><dt className="inline font-bold">Правильный ответ: </dt><dd className="inline">{formatAnswer(task, task.answer)}</dd></div>
               <div>
-                <dt className="inline font-bold">Самостоятельность: </dt>
+                <dt className="inline font-bold">Как выполнено: </dt>
                 <dd className="inline">
                   {independenceLabel(result)}
                 </dd>
@@ -755,7 +755,7 @@ function ResultDialog({ nextTask, result, retry, task }: {
             <p className="mt-4 text-sm leading-6 text-slate-700" id="result-explanation">{task.explanation}</p>
             {result.errors.length > 0 && (
               <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-slate-700">
-                <p className="font-bold text-rose-900">Диагностика решения</p>
+                <p className="font-bold text-rose-900">Что пошло не так</p>
                 <ul className="mt-1 space-y-2">
                   {result.errors.map((error) => {
                     const mistake = task.commonMistakes.find((candidate) => candidate.type === error)
@@ -893,14 +893,14 @@ function symbolsWord(value: number): string {
 
 function independenceLabel(result: AnswerResult): string {
   if (result.mode === 'exam') {
-    return 'экзаменационная попытка; в учебную самостоятельность не входит'
+    return 'экзаменационный режим; результат учитывается отдельно от учебных попыток'
   }
-  if (result.independent) return 'самостоятельное решение с первой попытки, без подсказок'
+  if (result.independent) return 'с первой попытки и без подсказок'
   if (result.hintsUsed > 0) {
-    return `с поддержкой, подсказок использовано: ${result.hintsUsed}`
+    return `с подсказками: использовано ${result.hintsUsed}`
   }
-  if (result.correct) return 'повторное решение после раскрытия ответа'
-  return 'без подсказок; самостоятельность не подтверждена'
+  if (result.correct) return 'после просмотра правильного ответа'
+  return 'без подсказок, но ответ пока неверный'
 }
 
 function formatTapeAnswer(tape: Record<number, string>): string {

@@ -72,10 +72,10 @@ describe('экран учебной задачи', () => {
 
     const result = screen.getByRole('alert')
     expect(result).toHaveTextContent('Пока неверно')
-    expect(result).toHaveTextContent('без подсказок; самостоятельность не подтверждена')
+    expect(result).toHaveTextContent('без подсказок, но ответ пока неверный')
     expect(result).toHaveTextContent('Твой ответ: Записать 1, сдвинуться влево, перейти в q1')
     expect(result).toHaveTextContent('Правильный ответ: Записать 1, сдвинуться вправо, перейти в q1')
-    expect(result).toHaveTextContent('Активную команду задаёт пара q0 и 0')
+    expect(result).toHaveTextContent('Машина находится в состоянии q0, а под головкой — 0')
     expect(result).toHaveTextContent('Перепутаны направления L и R.')
     expect(result).toHaveTextContent(
       'Следующий шаг: Сопоставь L с движением влево, а R — с движением вправо, затем перечитай среднюю часть активной команды.',
@@ -127,7 +127,7 @@ describe('экран учебной задачи', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Проверить ответ' }))
 
     expect(screen.getByRole('alert')).toHaveTextContent(
-      'Самостоятельность: повторное решение после раскрытия ответа',
+      'Как выполнено: после просмотра правильного ответа',
     )
     expect(screen.getByLabelText('Сохранённый прогресс')).toHaveTextContent(
       'Учебный режим: попыток 2, верно 1, самостоятельно 0',
@@ -219,7 +219,7 @@ describe('экран учебной задачи', () => {
     fireEvent.click(screen.getByLabelText('Записать 1, сдвинуться вправо, перейти в q1'))
     fireEvent.click(screen.getByRole('button', { name: 'Проверить ответ' }))
     expect(screen.getByRole('alert')).toHaveTextContent(
-      'Самостоятельность: с поддержкой, подсказок использовано: 2',
+      'Как выполнено: с подсказками: использовано 2',
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Решить ещё раз' }))
@@ -243,7 +243,7 @@ describe('экран учебной задачи', () => {
 
     expect(screen.getByRole('alert')).toHaveTextContent('Режим и время: экзаменационный, 00:01')
     expect(screen.getByRole('alert')).toHaveTextContent(
-      'Самостоятельность: экзаменационная попытка; в учебную самостоятельность не входит',
+      'Как выполнено: экзаменационный режим; результат учитывается отдельно от учебных попыток',
     )
     expect(screen.getByLabelText('Сохранённый прогресс')).toHaveTextContent(
       'экзамен: верно 1 из 1',
@@ -341,7 +341,7 @@ describe('экран учебной задачи', () => {
 
     const dialog = screen.getByRole('dialog', { name: 'Верно' })
     expect(dialog).toHaveTextContent(
-      'Самостоятельность: самостоятельное решение с первой попытки, без подсказок',
+      'Как выполнено: с первой попытки и без подсказок',
     )
     const title = within(dialog).getByRole('heading', { name: 'Верно' })
     const retry = within(dialog).getByRole('button', { name: 'Решить ещё раз' })
