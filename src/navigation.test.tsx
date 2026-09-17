@@ -28,7 +28,7 @@ describe('навигация приложения', () => {
     expect(screen.getByRole('heading', { name: 'Когда трассировать, а когда рассуждать?' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Выбрать задачу' }))
 
-    expect(screen.getByRole('heading', { name: 'Выбери мыслительное действие' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Выбери, что хочешь потренировать' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Открыть задачу «Предскажи следующий шаг»' }))
 
     expect(screen.getByRole('heading', { name: 'Предскажи следующий шаг' })).toBeInTheDocument()
@@ -120,7 +120,7 @@ describe('навигация приложения', () => {
 
     expect(screen.getByRole('heading', { name: 'Что тренировать дальше?' })).toBeInTheDocument()
     expect(screen.getByText('Предскажи следующий шаг')).toBeInTheDocument()
-    expect(screen.getAllByText('Самостоятельно')).toHaveLength(2)
+    expect(screen.getAllByText('Без подсказок')).toHaveLength(2)
     expect(screen.getByText('Решено 1 из 4')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Начать рекомендованную задачу' }))
@@ -147,7 +147,7 @@ describe('навигация приложения', () => {
 
     expect(screen.getByRole('heading', { name: 'Предскажи следующий шаг' })).toBeInTheDocument()
     expect(screen.getByText(
-      'Причина: ошибка «Перепутаны направления L и R» зафиксирована в 2 попытках.',
+      'Почему эта задача: ошибка «Перепутаны направления L и R» повторилась в 2 попытках.',
     )).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Начать рекомендованную задачу' }))
@@ -171,9 +171,9 @@ describe('навигация приложения', () => {
 
     const skillRow = screen.getByText('Роль состояния').parentElement?.parentElement
     if (skillRow === null || skillRow === undefined) throw new Error('Не найдена строка навыка')
-    expect(within(skillRow).getByText('Самостоятельно')).toBeInTheDocument()
+    expect(within(skillRow).getByText('Без подсказок')).toBeInTheDocument()
     expect(within(skillRow).getByText(
-      'Самостоятельное решение подтверждено. Перенос пока не проверен: в банке только одна задача на навык.',
+      'Задача решена без подсказок. Другой задачи для проверки этого навыка пока нет.',
     )).toBeInTheDocument()
     expect(screen.queryByText('Освоено')).not.toBeInTheDocument()
   })

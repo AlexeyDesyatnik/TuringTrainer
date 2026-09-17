@@ -26,10 +26,10 @@ export function TaskSelectorScreen() {
         </button>
         <div className="mt-7 grid gap-6 border-b border-slate-300 pb-7 lg:grid-cols-[1fr_auto] lg:items-end">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-violet-700">Каталог практики</p>
-            <h1 className="mt-2 text-4xl font-black tracking-tight text-slate-950">Выбери мыслительное действие</h1>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-violet-700">Задачи</p>
+            <h1 className="mt-2 text-4xl font-black tracking-tight text-slate-950">Выбери, что хочешь потренировать</h1>
             <p className="mt-3 max-w-2xl leading-7 text-slate-600">
-              Уровень определяется не длиной ленты, а способом рассуждения.
+              Уровень зависит от того, как нужно решать задачу, а не от длины ленты.
             </p>
           </div>
           <div aria-label="Режим для выбранной задачи" className="flex rounded-xl bg-slate-200 p-1" role="group">
@@ -52,9 +52,9 @@ export function TaskSelectorScreen() {
             Уровень
             <select className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-3" onChange={(event) => setLevel(event.target.value as typeof level)} value={level}>
               <option value="all">Все уровни</option>
-              <option value="1">1 · Механика</option>
-              <option value="2">2 · Алгоритм</option>
-              <option value="3">3 · Абстракция</option>
+              <option value="1">1 · Как работает машина</option>
+              <option value="2">2 · Что делает программа</option>
+              <option value="3">3 · Решение без полной трассировки</option>
             </select>
           </label>
           <label className="text-sm font-bold text-slate-700">
@@ -112,12 +112,12 @@ export function skillLabel(skill: string): string {
     'short-trace': 'Короткая трассировка',
     'command-completion': 'Восстановление команды',
     'state-role': 'Роль состояния',
-    'cycle-analysis': 'Анализ цикла',
+    'cycle-analysis': 'Поиск цикла',
     'multi-step-prediction': 'Прогноз нескольких шагов',
-    'algorithm-function': 'Функция алгоритма',
-    'one-way-pass': 'Однонаправленный проход',
-    'reverse-reasoning': 'Обратное рассуждение',
-    'pattern-recognition': 'Поиск закономерности',
+    'algorithm-function': 'Что делает программа',
+    'one-way-pass': 'Движение в одну сторону',
+    'reverse-reasoning': 'Решение от результата',
+    'pattern-recognition': 'Поиск правила',
     'alternating-states': 'Чередование состояний',
     'analytical-solution': 'Аналитическое решение',
   }

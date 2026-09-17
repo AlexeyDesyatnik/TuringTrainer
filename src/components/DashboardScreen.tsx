@@ -78,7 +78,7 @@ export function DashboardScreen() {
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-violet-700">Диагностика</p>
           <h1 className="mt-2 text-4xl font-black tracking-tight text-slate-950">Что тренировать дальше?</h1>
           <p className="mt-3 max-w-2xl leading-7 text-slate-600">
-            Прогресс основан на правильности, самостоятельности и переносе навыка, а не только на числе попыток.
+            Прогресс показывает верные ответы и решения без подсказок. Если для навыка есть несколько задач, он также проверяется на новой задаче.
           </p>
         </header>
 
@@ -133,7 +133,7 @@ export function DashboardScreen() {
             <section className="rounded-2xl bg-slate-950 p-5 text-white shadow-lg">
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-300">Рекомендация</p>
               {recommendation === null ? (
-                <p className="mt-3 leading-7 text-slate-200">Текущий набор решён самостоятельно. Можно переходить к новым задачам.</p>
+                <p className="mt-3 leading-7 text-slate-200">Все доступные задачи решены без подсказок. Можно переходить к новым задачам.</p>
               ) : (
                 <>
                   <h2 className="mt-3 text-xl font-black">{recommendation.task.title}</h2>
@@ -141,7 +141,7 @@ export function DashboardScreen() {
                     {recommendationReasonLabel(recommendation)}
                   </p>
                   <p className="mt-2 text-xs font-bold uppercase tracking-wide text-slate-400">
-                    Фокус: {skillLabel(recommendation.task.skills[0] ?? '')}
+                    Что тренируем: {skillLabel(recommendation.task.skills[0] ?? '')}
                   </p>
                   <button className="mt-5 w-full rounded-xl bg-amber-300 px-4 py-3 font-bold text-slate-950 hover:bg-amber-200" onClick={startRecommendation} type="button">
                     Начать рекомендованную задачу
@@ -153,7 +153,7 @@ export function DashboardScreen() {
             <section className="rounded-2xl border border-rose-200 bg-rose-50 p-5">
               <h2 className="font-black text-slate-950">Повторяющиеся ошибки</h2>
               {Object.keys(errorCounts).length === 0 ? (
-                <p className="mt-2 text-sm leading-6 text-slate-600">Диагностированных ошибок пока нет.</p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">Ошибок для разбора пока нет.</p>
               ) : (
                 <div className="mt-3 space-y-2">
                   {Object.entries(errorCounts).map(([error, count]) => (
@@ -166,9 +166,9 @@ export function DashboardScreen() {
             </section>
 
             <section className="rounded-2xl border border-violet-200 bg-violet-50 p-5">
-              <h2 className="font-black text-slate-950">Перенос прогресса</h2>
+              <h2 className="font-black text-slate-950">Резервная копия</h2>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Скачай резервную копию перед переносом автономного тренажёра на другой компьютер.
+                Скачай файл с прогрессом, чтобы продолжить работу на другом компьютере.
               </p>
               <div className="mt-4 grid gap-2">
                 <button
@@ -217,22 +217,21 @@ function Metric({ label, value }: { label: string; value: number | string }) {
 
 function skillEvidenceLabel(progress: SkillProgress): string {
   if (progress.availableTaskCount < MASTERY_TASK_THRESHOLD) {
-    const evidence = progress.independentTaskCount > 0
-      ? 'Самостоятельное решение подтверждено. '
-      : ''
-    return `${evidence}Перенос пока не проверен: в банке только одна задача на навык.`
+    return progress.independentTaskCount > 0
+      ? 'Задача решена без подсказок. Другой задачи для проверки этого навыка пока нет.'
+      : 'Для этого навыка пока есть только одна задача. Реши её без подсказок.'
   }
   if (progress.status === 'mastered') {
-    return `Перенос подтверждён на ${progress.independentTaskCount} разных задачах.`
+    return `Навык подтверждён в ${progress.independentTaskCount} разных задачах.`
   }
   if (progress.independentTaskCount > 0) {
-    return 'Самостоятельно решена одна задача; для проверки переноса нужна ещё одна.'
+    return 'Одна задача решена без подсказок. Реши ещё одну, чтобы проверить навык в новой ситуации.'
   }
   if (progress.status === 'solves') {
-    return 'Есть верное решение с поддержкой; самостоятельность пока не подтверждена.'
+    return 'Есть верный ответ с подсказкой. Попробуй решить задачу самостоятельно.'
   }
   if (progress.status === 'attempted') {
-    return 'Есть попытка; самостоятельное решение пока не подтверждено.'
+    return 'Попытка есть, но верного самостоятельного решения пока нет.'
   }
   return 'Попыток по навыку пока нет.'
 }
@@ -242,28 +241,28 @@ function recommendationReasonLabel(recommendation: TaskRecommendation): string {
   if (reason.type === 'error') {
     const label = errorLabel(reason.error, reason.sourceTaskId).replace(/\.$/, '')
     if (reason.attemptCount >= 2) {
-      return `Причина: ошибка «${label}» зафиксирована в ${reason.attemptCount} попытках.`
+      return `Почему эта задача: ошибка «${label}» повторилась в ${reason.attemptCount} попытках.`
     }
-    return `Причина: последняя диагностированная ошибка — «${label}».`
+    return `Почему эта задача: в последней попытке была ошибка «${label}».`
   }
   if (reason.type === 'independence-gap') {
-    return `По навыку «${skillLabel(reason.skill)}» пока нет самостоятельного решения.`
+    return `Навык «${skillLabel(reason.skill)}» ещё не проверен решением без подсказок.`
   }
   if (reason.type === 'transfer') {
-    return `По навыку «${skillLabel(reason.skill)}» уже есть одно самостоятельное решение; эта задача проверит перенос.`
+    return `Одна задача на навык «${skillLabel(reason.skill)}» уже решена без подсказок. Теперь проверь себя на новой задаче.`
   }
   if (reason.type === 'repeat-for-independence') {
-    return 'Задача решена, но самостоятельность с первой попытки не подтверждена.'
+    return 'Задача решена, но не с первого раза без подсказок.'
   }
-  return 'Задача ещё не решена в учебном режиме.'
+  return 'Эта задача ещё не решена в учебном режиме.'
 }
 
 function statusLabel(status: SkillStatus | 'not-started'): string {
   const labels = {
-    'not-started': 'Не начат',
+    'not-started': 'Нет попыток',
     attempted: 'Есть попытка',
-    solves: 'Решает',
-    independent: 'Самостоятельно',
+    solves: 'Есть верный ответ',
+    independent: 'Без подсказок',
     mastered: 'Освоено',
   }
   return labels[status]
@@ -287,7 +286,7 @@ function errorLabel(error: string, taskId?: string): string {
 }
 
 function levelName(level: 1 | 2 | 3): string {
-  if (level === 1) return 'Механика'
-  if (level === 2) return 'Алгоритм'
-  return 'Абстракция'
+  if (level === 1) return 'Как работает машина'
+  if (level === 2) return 'Что делает программа'
+  return 'Решение без полной трассировки'
 }
