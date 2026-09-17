@@ -50,7 +50,7 @@ interface SessionState {
   lastStep: StepResult | null
   reducedMotion: boolean
   openedHints: number
-  attemptStartedAtMs: number
+  attemptStartedAtMs: number | null
   executedSteps: number
   mode: AttemptMode
   elapsedMs: number
@@ -112,6 +112,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       stopExamTimer()
       return
     }
+    if (attemptStartedAtMs === null) return
     set({ elapsedMs: Math.max(0, Date.now() - attemptStartedAtMs) })
   }
 
@@ -229,7 +230,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     lastStep: null,
     reducedMotion: false,
     openedHints: 0,
-    attemptStartedAtMs: Date.now(),
+    attemptStartedAtMs: null,
     executedSteps: 0,
     mode: 'learning',
     elapsedMs: 0,
@@ -250,7 +251,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         pendingResult: null,
         lastStep: null,
         openedHints: 0,
-        attemptStartedAtMs: Date.now(),
+        attemptStartedAtMs: get().screen === 'task' ? Date.now() : null,
         executedSteps: 0,
         elapsedMs: 0,
       }))
@@ -325,18 +326,20 @@ export const useSessionStore = create<SessionState>((set, get) => {
       if (submitted === null) return
       stopAuto()
 
+      const startedAtMs = attemptStartedAtMs ?? Date.now()
+
       const correct = checkAnswer(task.answer, submitted)
       const simulationUsage = getSimulationUsage(executedSteps, machine.isHalted())
       const errors = [
         ...(correct ? [] : diagnoseErrors(task, submitted)),
         ...diagnoseStrategy(task, simulationUsage),
       ]
-      const durationMs = Math.max(0, Date.now() - attemptStartedAtMs)
+      const durationMs = Math.max(0, Date.now() - startedAtMs)
       stopExamTimer()
       const attempt: AttemptStats = {
         taskId: task.id,
         mode,
-        startedAt: new Date(attemptStartedAtMs).toISOString(),
+        startedAt: new Date(startedAtMs).toISOString(),
         durationMs,
         correct,
         hintsUsed: openedHints,
@@ -381,7 +384,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         pendingResult: null,
         lastStep: null,
         openedHints: 0,
-        attemptStartedAtMs: Date.now(),
+        attemptStartedAtMs: get().screen === 'task' ? Date.now() : null,
         executedSteps: 0,
         elapsedMs: 0,
       }))
@@ -492,7 +495,12 @@ export const useSessionStore = create<SessionState>((set, get) => {
         stopAuto()
         stopExamTimer()
       }
-      set({ screen })
+      set((state) => ({
+        screen,
+        attemptStartedAtMs: screen === 'task' && state.attemptStartedAtMs === null
+          ? Date.now()
+          : state.attemptStartedAtMs,
+      }))
       if (screen === 'task' && get().mode === 'exam' && get().result === null) {
         startExamTimer()
       }
@@ -504,7 +512,10 @@ export const useSessionStore = create<SessionState>((set, get) => {
       } else {
         get().selectTask(taskId)
       }
-      set({ screen: 'task' })
+      set((state) => ({
+        screen: 'task',
+        attemptStartedAtMs: state.attemptStartedAtMs ?? Date.now(),
+      }))
       if (get().mode === 'exam' && get().result === null) startExamTimer()
     },
   }

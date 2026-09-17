@@ -295,6 +295,19 @@ describe('экран учебной задачи', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('0 · L · q1')
   })
 
+  it('показывает обратную задачу без противоречащей конфигурации и запуска', () => {
+    useSessionStore.getState().selectTask('l2-reverse-01')
+    useSessionStore.getState().retry()
+    render(<App />)
+
+    expect(screen.getByRole('heading', { name: 'Таблица команд' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Состояние qA')).toBeInTheDocument()
+    expect(screen.getByText('Определи предыдущее состояние по условию и таблице команд.')).toBeInTheDocument()
+    expect(screen.queryByTestId('tape')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Шаг вперёд' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Авто' })).not.toBeInTheDocument()
+  })
+
   it('принимает ответ count в прогнозе нескольких шагов', () => {
     useSessionStore.getState().selectTask('l2-multi-prediction-01')
     useSessionStore.getState().retry()

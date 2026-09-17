@@ -5,11 +5,11 @@ const outputDirectory = resolve(process.argv[2] ?? 'dist-standalone')
 const files = await listFiles(outputDirectory)
 const relativeFiles = files.map((file) => relative(outputDirectory, file).replaceAll('\\', '/'))
 
-if (relativeFiles.length !== 1 || relativeFiles[0] !== 'index.html') {
-  throw new Error(`Ожидался только index.html, получено: ${relativeFiles.join(', ')}`)
+if (!relativeFiles.includes('index.html') || relativeFiles.some((file) => file !== 'index.html' && !file.startsWith('assets/'))) {
+  throw new Error(`Ожидались index.html и материалы в assets, получено: ${relativeFiles.join(', ')}`)
 }
 
-const html = await readFile(files[0], 'utf8')
+const html = await readFile(resolve(outputDirectory, 'index.html'), 'utf8')
 
 if (!html.includes('<style') || !html.includes('<script type="module">')) {
   throw new Error('JavaScript и CSS должны быть встроены в index.html')
@@ -17,6 +17,12 @@ if (!html.includes('<style') || !html.includes('<script type="module">')) {
 
 if (/<(?:script|link)\b[^>]*(?:src|href)=["'](?!data:)/i.test(html)) {
   throw new Error('index.html содержит ссылку на внешний JavaScript или CSS')
+}
+
+for (const file of relativeFiles.filter((file) => file.startsWith('assets/'))) {
+  if (!html.includes(file)) {
+    throw new Error(`index.html не ссылается на материал по его фактическому пути: ${file}`)
+  }
 }
 
 const scriptMarker = '<script type="module">'
@@ -28,12 +34,14 @@ if (scriptStart === -1 || scriptEnd <= scriptStart) {
 }
 
 try {
-  Function(html.slice(scriptStart + scriptMarker.length, scriptEnd))
+  const script = html.slice(scriptStart + scriptMarker.length, scriptEnd)
+    .replaceAll('import.meta.url', '"file:///index.html"')
+  Function(script)
 } catch (error) {
   throw new Error('Встроенный JavaScript повреждён', { cause: error })
 }
 
-console.log(`Standalone-сборка проверена: index.html (${Buffer.byteLength(html)} байт)`)
+console.log(`Standalone-комплект проверен: index.html (${Buffer.byteLength(html)} байт), материалов ${relativeFiles.length - 1}`)
 
 async function listFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true })

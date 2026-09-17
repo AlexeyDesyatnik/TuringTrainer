@@ -85,6 +85,7 @@ export function TaskScreen() {
   const predictionPending = task.answer.type === 'prediction' && stepCount === 0 && result === null
   const tape = machine.getTapeView(tapeCenter, 7)
   const displayedStep = animatedStep ?? lastStep
+  const isReverseTask = task.id === 'l2-reverse-01'
 
   return (
     <main className="min-h-screen pb-16">
@@ -155,7 +156,11 @@ export function TaskScreen() {
           <p className="font-mono text-xs text-slate-500">{task.source.label}</p>
         </section>
 
-        <section aria-labelledby="tape-heading" className="py-7">
+        {isReverseTask ? (
+          <p className="my-7 rounded-2xl border border-violet-200 bg-violet-50 p-5 font-semibold text-violet-950">
+            Определи предыдущее состояние по условию и таблице команд.
+          </p>
+        ) : <section aria-labelledby="tape-heading" className="py-7">
           <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Тренажёр</p>
@@ -209,12 +214,13 @@ export function TaskScreen() {
               })}
             </div>
           </div>
-        </section>
+        </section>}
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
-          <CommandTable task={task} currentState={state} readSymbol={readSymbol} />
+          <CommandTable task={task} currentState={isReverseTask ? null : state} readSymbol={isReverseTask ? null : readSymbol} />
 
           <aside className="space-y-4">
+            {!isReverseTask && (
             <section aria-labelledby="controls-heading" className="rounded-2xl bg-slate-950 p-5 text-white shadow-lg">
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Управление</p>
               <h3 id="controls-heading" className="mt-1 text-lg font-black">Выполнение</h3>
@@ -269,6 +275,7 @@ export function TaskScreen() {
                 </p>
               )}
             </section>
+            )}
             <HintPanel task={task} animationActive={animationPhase !== null} />
           </aside>
         </div>
@@ -425,8 +432,8 @@ function HintPanel({ task, animationActive }: { task: Task; animationActive: boo
 
 function CommandTable({ task, currentState, readSymbol }: {
   task: Task
-  currentState: string
-  readSymbol: string
+  currentState: string | null
+  readSymbol: string | null
 }) {
   return (
     <section aria-labelledby="commands-heading" className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">

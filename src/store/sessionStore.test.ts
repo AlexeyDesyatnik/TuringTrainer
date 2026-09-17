@@ -512,3 +512,51 @@ describe('экзаменационный режим', () => {
     expect(useSessionStore.getState().elapsedMs).toBe(500)
   })
 })
+
+describe('отсчёт попытки', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-09-17T09:00:00Z'))
+    useProgressStore.getState().clearProgress()
+    const store = useSessionStore.getState()
+    store.setMode('learning')
+    store.navigate('home')
+    store.selectTask('l1-command-reading-01')
+    store.retry()
+  })
+
+  afterEach(() => {
+    useSessionStore.getState().stopExamTimer()
+    vi.useRealTimers()
+  })
+
+  it('не включает ожидание на главной в первую попытку', () => {
+    vi.advanceTimersByTime(60_000)
+    useSessionStore.getState().navigate('task')
+    vi.advanceTimersByTime(2_000)
+    useSessionStore.getState().setChoice('write-1-right-q1')
+    useSessionStore.getState().submitAnswer()
+    expect(useSessionStore.getState().result?.durationMs).toBe(2_000)
+  })
+
+  it('не обнуляет время при возврате к начатой задаче', () => {
+    useSessionStore.getState().navigate('task')
+    vi.advanceTimersByTime(2_000)
+    useSessionStore.getState().navigate('home')
+    vi.advanceTimersByTime(3_000)
+    useSessionStore.getState().navigate('task')
+    useSessionStore.getState().setChoice('write-1-right-q1')
+    useSessionStore.getState().submitAnswer()
+    expect(useSessionStore.getState().result?.durationMs).toBe(5_000)
+  })
+
+  it('начинает новый отсчёт после повторного решения', () => {
+    useSessionStore.getState().navigate('task')
+    vi.advanceTimersByTime(4_000)
+    useSessionStore.getState().retry()
+    vi.advanceTimersByTime(1_500)
+    useSessionStore.getState().setChoice('write-1-right-q1')
+    useSessionStore.getState().submitAnswer()
+    expect(useSessionStore.getState().result?.durationMs).toBe(1_500)
+  })
+})

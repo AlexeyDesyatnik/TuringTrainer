@@ -25,9 +25,29 @@ describe('runtime-валидация задач', () => {
       'algorithm', 'prediction', 'algorithm', 'reverse',
     ])
     expect(tasks.filter((task) => task.level === 3).map((task) => task.format)).toEqual([
-      'pattern', 'exam',
+      'pattern', 'exam', 'exam', 'exam',
     ])
-    expect(tasks).toHaveLength(10)
+    expect(tasks).toHaveLength(12)
+  })
+
+  it.each([
+    ['l3-strategy-comparison-a', 10, 21],
+    ['l3-strategy-comparison-b', 11, 23],
+  ])('проверяет экспериментальную задачу %s', (id, remaining, steps) => {
+    const task = getTask(id)
+    const machine = new TuringMachine(task.machine)
+    while (!machine.isHalted()) machine.step()
+
+    expect(task.answer).toEqual({ type: 'count', symbol: '1', value: remaining })
+    expect(machine.countSymbol('1')).toBe(remaining)
+    expect(machine.getStepCount()).toBe(steps)
+    expect(task.commonMistakes.map((mistake) => mistake.type)).not.toContain('full-trace-overuse')
+  })
+
+  it('использует одинаковую структуру команд в экспериментальной паре', () => {
+    const taskA = getTask('l3-strategy-comparison-a')
+    const taskB = getTask('l3-strategy-comparison-b')
+    expect(taskA.machine.commands).toEqual(taskB.machine.commands)
   })
 
   it('останавливает все машины набора без достижения защитного лимита', () => {

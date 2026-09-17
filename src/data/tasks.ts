@@ -7,6 +7,46 @@ function tapeFromString(value: string): Record<number, string> {
   return Object.fromEntries(Array.from(value, (symbol, index) => [index, symbol]))
 }
 
+function strategyComparisonTask(variant: 'A' | 'B', length: number): Task {
+  const remaining = Math.floor(length / 2)
+  const lengthLabel = length === 22 ? '22 единицы' : `${length} единиц`
+  return {
+    id: `l3-strategy-comparison-${variant.toLowerCase()}`,
+    level: 3,
+    format: 'exam',
+    skills: ['alternating-states', 'analytical-solution'],
+    title: `Экспериментальная пара ${variant} · ${lengthLabel}`,
+    description: `На ленте записаны ${lengthLabel} подряд. Сколько единиц останется после остановки? Способ решения указан на карточке вашей команды.`,
+    machine: {
+      initialTape: tapeFromString('1'.repeat(length)),
+      headPosition: 0,
+      initialState: 'erase',
+      commands: {
+        [makeCommandKey('erase', '1')]: { write: EMPTY_SYMBOL, direction: 'R', nextState: 'keep' },
+        [makeCommandKey('keep', '1')]: { write: '1', direction: 'R', nextState: 'erase' },
+        [makeCommandKey('erase', EMPTY_SYMBOL)]: { write: EMPTY_SYMBOL, direction: 'S', nextState: 'halt' },
+        [makeCommandKey('keep', EMPTY_SYMBOL)]: { write: EMPTY_SYMBOL, direction: 'S', nextState: 'halt' },
+      },
+      stepLimit: length + 5,
+    },
+    alphabet: [EMPTY_SYMBOL, '1'],
+    states: ['erase', 'keep', 'halt'],
+    answer: { type: 'count', symbol: '1', value: remaining },
+    hints: [
+      'Сравни действия состояний erase и keep на соседних единицах.',
+      'Две соседние единицы образуют повторяющуюся пару: первая стирается, вторая сохраняется.',
+      `Раздели ${length} на пары. Каждая пара оставляет одну единицу.`,
+    ],
+    explanation: `Состояния erase и keep чередуются. В каждой паре первая единица стирается, а вторая сохраняется. Поэтому ${lengthLabel} образуют ${remaining} пар и после остановки остаётся ${remaining} единиц. Останавливающая команда на λ входит в число выполненных команд.`,
+    commonMistakes: [
+      { type: 'cycle-missed', description: 'Не замечено чередование erase и keep.', nextAction: 'Объедини две соседние команды в один повторяющийся цикл: стереть первую единицу и сохранить вторую.' },
+      { type: 'stop-step-not-counted', description: 'Останавливающая команда на λ не включена в число команд.', nextAction: `После обработки ${length} единиц добавь последнюю команду S на пустой ячейке.` },
+      { type: 'wrong-count', description: 'Неверно подсчитано число сохранённых единиц.', nextAction: `Разбей ${length} единиц на пары и считай по одной сохранённой единице на пару.` },
+    ],
+    source: { kind: 'original', label: 'Авторская экспериментальная задача' },
+  }
+}
+
 const rawTasks = [
   {
     id: 'l1-command-reading-01',
@@ -454,6 +494,8 @@ const rawTasks = [
     ],
     source: { kind: 'original', label: 'Авторская задача экзаменационного формата' },
   },
+  strategyComparisonTask('A', 20),
+  strategyComparisonTask('B', 22),
 ] satisfies Task[]
 
 export const tasks = parseTasks(rawTasks)

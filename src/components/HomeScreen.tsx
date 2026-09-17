@@ -1,5 +1,16 @@
 import { getProgressSummary, useProgressStore } from '../store/progressStore'
 import { useSessionStore } from '../store/sessionStore'
+import assessmentMaterialsUrl from '../../methodical-development/Assessment_materials.docx?url'
+import diagnosticRouteExampleUrl from '../../methodical-development/Diagnostic_route_example.docx?url'
+import diagnosticRouteTemplateUrl from '../../methodical-development/Diagnostic_route_template.docx?url'
+import experimentCardsUrl from '../../methodical-development/Experiment_cards.docx?url'
+import offlineReserveUrl from '../../methodical-development/Offline_reserve_pack.docx?url'
+import passportUrl from '../../methodical-development/Passport_metodicheskoi_razrabotki_TuringTrainer.docx?url'
+import presentationUrl from '../../methodical-development/Presentation_TuringTrainer_5_minutes_methodical_v3.pptx?url'
+import projectCaseUrl from '../../methodical-development/Project_case_students.docx?url'
+import rubricUrl from '../../methodical-development/Detailed_product_rubric.docx?url'
+import studentWorksheetUrl from '../../methodical-development/Student_worksheet.docx?url'
+import teacherKitUrl from '../../methodical-development/Teacher_methodical_kit.docx?url'
 
 const primaryButton =
   'rounded-full bg-amber-300 px-6 py-3 font-bold text-slate-950 transition hover:bg-amber-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-300'
@@ -17,7 +28,7 @@ const sprints = [
     number: '02',
     title: 'Сравнение способов',
     duration: '20 минут',
-    description: 'Решить задачи тремя способами и сравнить время, шаги, подсказки, ошибки и результат.',
+    description: 'Выполнить контролируемую пару двумя назначенными способами и сравнить результаты попыток 2 и 3.',
   },
   {
     number: '03',
@@ -107,14 +118,14 @@ export function HomeScreen() {
             </div>
 
             <p className="mt-8 font-mono text-xs font-bold uppercase tracking-[0.24em] text-amber-300">
-              Исследуй · докажи · передай другому
+              Проектное занятие по выбору способа решения
             </p>
             <h1 id="home-title" className="mt-5 max-w-4xl text-5xl font-black leading-[0.96] tracking-tight sm:text-7xl">
               Когда трассировать,
               <span className="block text-slate-400">а когда рассуждать?</span>
             </h1>
             <p className="mt-7 max-w-2xl text-lg leading-8 text-slate-300">
-              Сравните в тренажёре несколько способов решения, найдите правило и составьте для другой команды понятную схему выбора.
+              Выполните свободную входную попытку, затем сравните два назначенных способа на экспериментальной паре и составьте для другой команды понятную схему выбора.
             </p>
             <div className="mt-9 flex flex-wrap gap-3">
               <button className={primaryButton} onClick={() => navigate('task')} type="button">
@@ -271,9 +282,22 @@ export function HomeScreen() {
             <p className="mt-4 leading-7 text-slate-300">Сначала предскажите следующий шаг, затем проверьте себя. Результаты попыток понадобятся при сборке маршрута.</p>
           </div>
           <div className="mt-8 flex flex-wrap gap-3 lg:mt-0 lg:shrink-0">
-            <button className={primaryButton} onClick={() => navigate('task')} type="button">Перейти к первой задаче</button>
+            <button className={primaryButton} onClick={() => navigate('task')} type="button">Открыть тренажёр</button>
             <button className={secondaryButton} onClick={() => navigate('dashboard')} type="button">Результаты попыток</button>
           </div>
+        </div>
+      </section>
+
+      <section className="border-t border-white/10 bg-white/[0.03]" id="materials" aria-labelledby="materials-title">
+        <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 lg:px-10 lg:py-20">
+          <p className="font-mono text-xs font-bold uppercase tracking-[0.2em] text-violet-300">Файлы для проведения</p>
+          <h2 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl" id="materials-title">Материалы занятия</h2>
+          <p className="mt-4 max-w-3xl leading-7 text-slate-300">Скачайте рабочие материалы до занятия. Файлы с ключами размещены отдельно, но статический сайт не ограничивает доступ к ним.</p>
+          <div className="mt-8 grid gap-8 lg:grid-cols-2">
+            <MaterialGroup title="Для учеников" files={studentMaterials} />
+            <MaterialGroup title="Для учителя и демонстрации" files={teacherMaterials} />
+          </div>
+          <p className="mt-8 text-sm leading-6 text-slate-400">Для автономной работы передайте учителю файл <strong className="text-slate-200">index.html</strong> вместе с соседней папкой <strong className="text-slate-200">assets</strong>. Ссылки работают, если их взаимное расположение не менять.</p>
         </div>
       </section>
 
@@ -284,5 +308,39 @@ export function HomeScreen() {
         </div>
       </footer>
     </main>
+  )
+}
+
+const studentMaterials = [
+  ['Рабочий лист', studentWorksheetUrl],
+  ['Проектное задание', projectCaseUrl],
+  ['Шаблон диагностического маршрута', diagnosticRouteTemplateUrl],
+  ['Итоговые задания', assessmentMaterialsUrl],
+] as const
+
+const teacherMaterials = [
+  ['Комплект учителя', teacherKitUrl],
+  ['Карточки экспериментальной пары', experimentCardsUrl],
+  ['Резерв без компьютера', offlineReserveUrl],
+  ['Заполненный образец маршрута', diagnosticRouteExampleUrl],
+  ['Подробный рубрикатор', rubricUrl],
+  ['Паспорт разработки', passportUrl],
+  ['Актуальная презентация', presentationUrl],
+] as const
+
+function MaterialGroup({ title, files }: { title: string; files: ReadonlyArray<readonly [string, string]> }) {
+  return (
+    <section>
+      <h3 className="text-xl font-black">{title}</h3>
+      <ul className="mt-4 space-y-3">
+        {files.map(([label, fileName]) => (
+          <li key={fileName}>
+            <a className="block rounded-xl border border-white/10 bg-slate-900 px-4 py-3 font-semibold text-slate-100 transition hover:border-violet-300 hover:text-white" href={fileName}>
+              {label}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }

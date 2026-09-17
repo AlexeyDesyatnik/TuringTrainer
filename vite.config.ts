@@ -33,16 +33,23 @@ function standaloneHtmlPlugin(): Plugin {
       }
 
       let html = assetText(htmlAsset)
+      const externalAssetFileNames = Object.keys(bundle).filter(
+        (fileName) => fileName.startsWith('assets/') && !fileName.endsWith('.css'),
+      )
 
       for (const [fileName, item] of Object.entries(bundle)) {
         if (item === htmlAsset) continue
 
         if (item.type === 'chunk' && fileName.endsWith('.js')) {
+          const code = externalAssetFileNames.reduce(
+            (currentCode, assetFileName) => prefixInlineAssetUrl(currentCode, assetFileName),
+            item.code,
+          )
           html = replaceAssetTag(
             html,
             fileName,
             'script',
-            `<script type="module">${escapeClosingTag(item.code, 'script')}</script>`,
+            `<script type="module">${escapeClosingTag(code, 'script')}</script>`,
           )
           delete bundle[fileName]
           continue
@@ -59,12 +66,23 @@ function standaloneHtmlPlugin(): Plugin {
           continue
         }
 
+        if (fileName.startsWith('assets/') && !fileName.endsWith('.css')) continue
+
         throw new Error(`Standalone-сборка содержит неподдерживаемый файл: ${fileName}`)
       }
 
       htmlAsset.source = html
     },
   }
+}
+
+function prefixInlineAssetUrl(code: string, assetFileName: string): string {
+  const baseName = assetFileName.slice('assets/'.length)
+  const escapedBaseName = baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return code.replace(
+    new RegExp(`new URL\\(([\`'"])${escapedBaseName}\\1,import\\.meta\\.url\\)`, 'g'),
+    (_match, quote: string) => `new URL(${quote}${assetFileName}${quote},import.meta.url)`,
+  )
 }
 
 function replaceAssetTag(
