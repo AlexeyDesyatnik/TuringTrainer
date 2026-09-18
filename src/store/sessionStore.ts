@@ -48,6 +48,7 @@ interface SessionState {
   animationPhase: AnimationPhase
   animatedStep: StepResult | null
   lastStep: StepResult | null
+  lastStepAnimated: boolean
   reducedMotion: boolean
   openedHints: number
   attemptStartedAtMs: number
@@ -192,6 +193,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       animationPhase: shouldAnimate ? 'write' : null,
       animatedStep: shouldAnimate ? stepResult : null,
       lastStep: stepResult,
+      lastStepAnimated: shouldAnimate,
       autoRunning: shouldAnimate
         ? state.autoRunning
         : state.autoRunning && !machine.isHalted(),
@@ -227,6 +229,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     animationPhase: null,
     animatedStep: null,
     lastStep: null,
+    lastStepAnimated: false,
     reducedMotion: false,
     openedHints: 0,
     attemptStartedAtMs: Date.now(),
@@ -249,6 +252,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         result: null,
         pendingResult: null,
         lastStep: null,
+        lastStepAnimated: false,
         openedHints: 0,
         attemptStartedAtMs: Date.now(),
         executedSteps: 0,
@@ -269,7 +273,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       if (result !== null) return
       stopAuto()
       if (!machine.undo()) return
-      set((state) => ({ revision: state.revision + 1, lastStep: null }))
+      set((state) => ({ revision: state.revision + 1, lastStep: null, lastStepAnimated: false }))
     },
 
     reset: () => {
@@ -282,6 +286,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         result: null,
         pendingResult: null,
         lastStep: null,
+        lastStepAnimated: false,
       }))
     },
 
@@ -380,6 +385,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         result: null,
         pendingResult: null,
         lastStep: null,
+        lastStepAnimated: false,
         openedHints: 0,
         attemptStartedAtMs: Date.now(),
         executedSteps: 0,
@@ -446,7 +452,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       const { animationPhase, autoRunning, lastStep, result } = get()
       if (lastStep === null || animationPhase !== null || autoRunning || result !== null) return
 
-      set({ animationPhase: 'write', animatedStep: lastStep })
+      set({ animationPhase: 'write', animatedStep: lastStep, lastStepAnimated: true })
       schedule(advanceAnimation, getPhaseDuration('write', get().autoSpeedMs))
     },
 
@@ -478,6 +484,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         result: null,
         pendingResult: null,
         lastStep: null,
+        lastStepAnimated: false,
         openedHints: 0,
       }))
       if (mode === 'exam' && get().screen === 'task') startExamTimer()

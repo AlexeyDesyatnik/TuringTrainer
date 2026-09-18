@@ -36,6 +36,7 @@ export function TaskScreen() {
   const animationPhase = useSessionStore((state) => state.animationPhase)
   const animatedStep = useSessionStore((state) => state.animatedStep)
   const lastStep = useSessionStore((state) => state.lastStep)
+  const lastStepAnimated = useSessionStore((state) => state.lastStepAnimated)
   const mode = useSessionStore((state) => state.mode)
   const elapsedMs = useSessionStore((state) => state.elapsedMs)
   const selectTask = useSessionStore((state) => state.selectTask)
@@ -175,7 +176,11 @@ export function TaskScreen() {
           </div>
 
           {displayedStep !== null && (
-            <StepExplanation phase={animationPhase} step={displayedStep} />
+            <StepExplanation
+              phase={animationPhase}
+              step={displayedStep}
+              instant={animationPhase === null && !lastStepAnimated}
+            />
           )}
 
           <div className="overflow-x-auto rounded-2xl border border-slate-300 bg-white px-4 pb-4 pt-10 shadow-sm">
@@ -279,7 +284,7 @@ export function TaskScreen() {
   )
 }
 
-function StepExplanation({ phase, step }: { phase: AnimationPhase; step: StepResult }) {
+function StepExplanation({ phase, step, instant }: { phase: AnimationPhase; step: StepResult; instant: boolean }) {
   const replayLastStep = useSessionStore((state) => state.replayLastStep)
   const phases: Array<{
     id: Exclude<AnimationPhase, null>
@@ -317,7 +322,7 @@ function StepExplanation({ phase, step }: { phase: AnimationPhase; step: StepRes
         </p>
         <div className="flex items-center gap-3">
           <p className="text-xs font-bold uppercase tracking-wide text-violet-700">
-            {phase === null ? 'Шаг завершён' : `${activeIndex + 1} из 3`}
+            {phase === null ? (instant ? 'Мгновенный шаг' : 'Шаг завершён') : `${activeIndex + 1} из 3`}
           </p>
           {phase === null && (
             <button
@@ -335,10 +340,16 @@ function StepExplanation({ phase, step }: { phase: AnimationPhase; step: StepRes
           {animationPhaseLabel(phase)}. {animationDescription(phase, step)}
         </p>
       )}
+      {instant && (
+        <p className="mt-2 text-sm leading-6 text-violet-900">
+          Шаг выполнен сразу без пошаговой анимации. Части команды перечислены ниже;
+          чтобы посмотреть их по очереди, нажми «Повторить анимацию».
+        </p>
+      )}
       <ol className="mt-3 grid gap-2 md:grid-cols-3">
         {phases.map((item, index) => {
-          const completed = phase === null || index < activeIndex
-          const active = index === activeIndex
+          const completed = !instant && (phase === null || index < activeIndex)
+          const active = !instant && index === activeIndex
           return (
             <li
               className={`rounded-xl border px-3 py-3 text-sm ${

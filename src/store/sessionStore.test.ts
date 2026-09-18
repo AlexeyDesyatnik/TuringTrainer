@@ -194,7 +194,63 @@ describe('трёхфазная анимация', () => {
 
     expect(useSessionStore.getState().machine.getStepCount()).toBe(1)
     expect(useSessionStore.getState().animationPhase).toBeNull()
+    expect(useSessionStore.getState().lastStepAnimated).toBe(false)
     expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('выполняет шаг уровня 2 мгновенно и помечает его как неанимированный', () => {
+    useSessionStore.getState().selectTask('l2-state-role-01')
+    useSessionStore.getState().retry()
+    useSessionStore.getState().setReducedMotion(false)
+    useSessionStore.getState().step()
+
+    const state = useSessionStore.getState()
+    expect(state.machine.getStepCount()).toBe(1)
+    expect(state.animationPhase).toBeNull()
+    expect(state.animatedStep).toBeNull()
+    expect(state.lastStep).not.toBeNull()
+    expect(state.lastStepAnimated).toBe(false)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('помечает анимированный шаг уровня 1 даже после завершения фаз', () => {
+    useSessionStore.getState().step()
+    expect(useSessionStore.getState().lastStepAnimated).toBe(true)
+
+    vi.advanceTimersByTime(ANIMATION_PHASE_MS + 1100 + ANIMATION_PHASE_MS)
+
+    const state = useSessionStore.getState()
+    expect(state.animationPhase).toBeNull()
+    expect(state.animatedStep).toBeNull()
+    expect(state.lastStepAnimated).toBe(true)
+  })
+
+  it('повтор анимации помечает мгновенный шаг как анимированный', () => {
+    useSessionStore.getState().selectTask('l2-state-role-01')
+    useSessionStore.getState().retry()
+    useSessionStore.getState().setReducedMotion(false)
+    useSessionStore.getState().step()
+    expect(useSessionStore.getState().lastStepAnimated).toBe(false)
+
+    useSessionStore.getState().replayLastStep()
+
+    const state = useSessionStore.getState()
+    expect(state.animationPhase).toBe('write')
+    expect(state.lastStepAnimated).toBe(true)
+  })
+
+  it('сбрасывает пометку анимации при undo и reset', () => {
+    useSessionStore.getState().step()
+    vi.advanceTimersByTime(ANIMATION_PHASE_MS + 1100 + ANIMATION_PHASE_MS)
+    expect(useSessionStore.getState().lastStepAnimated).toBe(true)
+
+    useSessionStore.getState().undo()
+    expect(useSessionStore.getState().lastStepAnimated).toBe(false)
+
+    useSessionStore.getState().step()
+    vi.advanceTimersByTime(ANIMATION_PHASE_MS + 1100 + ANIMATION_PHASE_MS)
+    useSessionStore.getState().reset()
+    expect(useSessionStore.getState().lastStepAnimated).toBe(false)
   })
 
   it('не запускает пересекающийся ручной шаг во время анимации', () => {

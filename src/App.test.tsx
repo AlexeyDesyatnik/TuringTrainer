@@ -52,7 +52,9 @@ describe('экран учебной задачи', () => {
     expect(stepExplanation).toHaveTextContent('Ячейка 0: 0 → 1')
     expect(stepExplanation).toHaveTextContent('Головка: 0 → 1')
     expect(stepExplanation).toHaveTextContent('Состояние: q0 → q1')
-    expect(stepExplanation).toHaveTextContent('Шаг завершён')
+    expect(stepExplanation).toHaveTextContent('Мгновенный шаг')
+    expect(stepExplanation).not.toHaveTextContent('Шаг завершён')
+    expect(stepExplanation).not.toHaveTextContent('✓')
 
     fireEvent.click(back)
     expect(status).toHaveTextContent('Состояние q0')
@@ -190,6 +192,22 @@ describe('экран учебной задачи', () => {
     act(() => vi.advanceTimersByTime(2900))
     expect(screen.getByTestId('step-explanation')).toHaveTextContent('Шаг завершён')
     expect(useSessionStore.getState().machine.getStepCount()).toBe(1)
+  })
+
+  it('показывает мгновенный шаг задачи 5 без отметок выполнения фаз', () => {
+    useSessionStore.getState().selectTask('l2-state-role-01')
+    useSessionStore.getState().retry()
+    render(<App />)
+
+    expect(screen.getByRole('heading', { name: 'Роль состояния return' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Шаг вперёд' }))
+
+    const stepExplanation = screen.getByTestId('step-explanation')
+    expect(stepExplanation).toHaveTextContent('Мгновенный шаг')
+    expect(stepExplanation).not.toHaveTextContent('Шаг завершён')
+    expect(stepExplanation).not.toHaveTextContent('✓')
+    expect(screen.queryByTestId('animation-phase')).not.toBeInTheDocument()
   })
 
   it('показывает понятный темп и ускоряет анимацию при движении регулятора вправо', () => {
