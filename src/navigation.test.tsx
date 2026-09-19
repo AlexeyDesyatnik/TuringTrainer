@@ -35,6 +35,32 @@ describe('навигация приложения', () => {
     expect(useSessionStore.getState().screen).toBe('task')
   })
 
+  it('переключает задачи без прокручиваемой горизонтальной ленты', () => {
+    useSessionStore.getState().navigate('task')
+    render(<App />)
+
+    const taskSelect = screen.getByRole('combobox', { name: 'Выбрать задачу' })
+    const previous = screen.getByRole('button', { name: 'Предыдущая задача' })
+    const next = screen.getByRole('button', { name: 'Следующая задача' })
+
+    expect(taskSelect).toHaveValue('l1-command-reading-01')
+    expect(previous).toBeDisabled()
+    expect(next).toBeEnabled()
+
+    fireEvent.click(next)
+    expect(screen.getByRole('heading', { name: 'Предскажи следующий шаг' })).toBeInTheDocument()
+    expect(taskSelect).toHaveValue('l1-prediction-01')
+    expect(previous).toBeEnabled()
+
+    fireEvent.change(taskSelect, { target: { value: 'l3-exam-01' } })
+    expect(screen.getByRole('heading', { name: 'Каждая вторая единица' })).toBeInTheDocument()
+    expect(taskSelect).toHaveValue('l3-exam-01')
+    expect(next).toBeDisabled()
+
+    fireEvent.click(previous)
+    expect(screen.getByRole('heading', { name: 'Инверсия длинной ленты' })).toBeInTheDocument()
+  })
+
   it('показывает на главной методический контекст занятия', () => {
     render(<App />)
 

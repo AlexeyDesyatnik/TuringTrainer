@@ -86,6 +86,9 @@ export function TaskScreen() {
   const predictionPending = task.answer.type === 'prediction' && stepCount === 0 && result === null
   const tape = machine.getTapeView(tapeCenter, 7)
   const displayedStep = animatedStep ?? lastStep
+  const taskIndex = tasks.findIndex((item) => item.id === task.id)
+  const previousTask = tasks[taskIndex - 1]
+  const followingTask = tasks[taskIndex + 1]
 
   return (
     <main className="min-h-screen pb-16">
@@ -104,22 +107,43 @@ export function TaskScreen() {
               <button className="hover:text-white hover:underline" onClick={() => navigate('dashboard')} type="button">Прогресс</button>
             </nav>
           </div>
-          <div className="min-w-0">
-            <nav aria-label="Учебные задачи" className="flex gap-2 overflow-x-auto pb-1">
-              {tasks.map((item, index) => (
+          <div className="min-w-0 lg:w-[42rem]">
+            <nav aria-label="Учебные задачи" className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+              <label className="min-w-0 text-xs font-bold uppercase tracking-[0.16em] text-slate-300">
+                Задача {taskIndex + 1} из {tasks.length}
+                <select
+                  aria-label="Выбрать задачу"
+                  className="mt-2 block w-full min-w-0 rounded-xl border border-slate-600 bg-slate-900 px-3 py-2.5 text-sm font-semibold normal-case tracking-normal text-white focus:border-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-300/30"
+                  onChange={(event) => selectTask(event.target.value)}
+                  value={task.id}
+                >
+                  {tasks.map((item, index) => (
+                    <option key={item.id} value={item.id}>
+                      {index + 1}. {item.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="grid grid-cols-2 gap-2">
                 <button
-                  className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 ${
-                    item.id === task.id
-                      ? 'border-amber-300 bg-amber-300 text-slate-950'
-                      : 'border-slate-600 text-slate-200 hover:border-slate-300'
-                  }`}
-                  key={item.id}
-                  onClick={() => selectTask(item.id)}
+                  aria-label="Предыдущая задача"
+                  className="rounded-xl border border-slate-600 px-3 py-2.5 text-sm font-bold text-slate-200 transition hover:border-slate-300 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 disabled:cursor-not-allowed disabled:border-slate-800 disabled:text-slate-600"
+                  disabled={previousTask === undefined}
+                  onClick={() => previousTask !== undefined && selectTask(previousTask.id)}
                   type="button"
                 >
-                  {index + 1}. {item.title}
+                  <span aria-hidden="true">←</span> Назад
                 </button>
-              ))}
+                <button
+                  aria-label="Следующая задача"
+                  className="rounded-xl border border-slate-600 px-3 py-2.5 text-sm font-bold text-slate-200 transition hover:border-slate-300 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 disabled:cursor-not-allowed disabled:border-slate-800 disabled:text-slate-600"
+                  disabled={followingTask === undefined}
+                  onClick={() => followingTask !== undefined && selectTask(followingTask.id)}
+                  type="button"
+                >
+                  Вперёд <span aria-hidden="true">→</span>
+                </button>
+              </div>
             </nav>
             <ProgressSummary />
           </div>

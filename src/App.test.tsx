@@ -96,7 +96,9 @@ describe('экран учебной задачи', () => {
     useSessionStore.getState().setReducedMotion(false)
     useSessionStore.getState().setAutoSpeed(ANIMATION_PHASE_MS)
     render(<App />)
-    fireEvent.click(screen.getByRole('button', { name: '2. Предскажи следующий шаг' }))
+    fireEvent.change(screen.getByRole('combobox', { name: 'Выбрать задачу' }), {
+      target: { value: 'l1-prediction-01' },
+    })
 
     const forward = screen.getByRole('button', { name: 'Шаг вперёд' })
     expect(forward).toBeDisabled()
